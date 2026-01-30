@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Eco Jeopardy Board</title>
+  <link rel="stylesheet" href="../css/style.css"/>
+  <link rel="icon" href="data:,">
+
+  <style>
+    .boardShell{
+      width:min(980px, 96vw);
+      background: rgba(130, 190, 160, .55);
+      border-radius:28px;
+      padding:22px 20px 18px;
+      box-shadow:0 30px 80px rgba(0,0,0,.20);
+      position:relative;
+    }
+    .topLine{
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      font-weight:900; color:#21351e; opacity:.9; margin-bottom:8px;
+    }
+    .roundTitle{
+      font-size:64px; font-weight:1200; color:#294023;
+      text-align:center; margin:8px 0 14px;
+    }
+    .cats{
+      display:grid; grid-template-columns:repeat(5, 1fr);
+      gap:14px; margin-bottom:12px;
+    }
+    .cat{
+      border-radius:999px; padding:12px 14px; text-align:center;
+      background: rgba(114, 190, 86, .38);
+      font-weight:1100; color:#1b2f1a; text-transform:lowercase;
+    }
+    .grid{
+      display:grid; grid-template-columns:repeat(5, 1fr);
+      gap:14px; padding-bottom:8px;
+    }
+    .cell{
+      border-radius:999px; padding:14px 10px; text-align:center;
+      background: rgba(240, 255, 190, .75);
+      font-weight:1200; color:#d60000;
+      cursor:pointer; user-select:none;
+      border:2px solid transparent;
+      transition: transform .08s ease, filter .12s ease, border-color .12s ease;
+    }
+    .cell:hover{ transform: translateY(-1px); filter: brightness(1.03); }
+    .cell.selected{ border-color: rgba(59,130,246,.9); box-shadow:0 0 0 4px rgba(59,130,246,.15); }
+    .cell.opened{ opacity:.45; cursor:not-allowed; text-decoration:line-through; }
+    .cell.disabled{ opacity:.38; cursor:not-allowed; }
+    .muted{ opacity:.75; font-weight:900; color:#21351e; }
+
+    /* Requests drawer (teacher only) */
+    .reqFab{
+      position:fixed; left:16px; bottom:16px;
+      border:none; border-radius:999px;
+      padding:12px 16px;
+      font-weight:1100;
+      box-shadow:0 12px 30px rgba(0,0,0,.18);
+      background: rgba(255,255,255,.92);
+      cursor:pointer;
+      display:none;
+    }
+    .reqDrawer{
+      position:fixed; top:0; left:-380px;
+      width:360px; height:100vh;
+      background: rgba(255,255,255,.92);
+      border-right:1px solid rgba(0,0,0,.08);
+      box-shadow:18px 0 40px rgba(0,0,0,.14);
+      padding:16px;
+      transition:left .2s ease;
+      backdrop-filter: blur(8px);
+      z-index:60;
+    }
+    .reqHead{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .reqTitle{ font-weight:1200; font-size:18px; }
+    .reqClose{
+      border:none; border-radius:12px;
+      padding:8px 10px; cursor:pointer;
+      font-weight:1000;
+      background: rgba(0,0,0,.06);
+    }
+    .reqList{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
+    .reqCard{
+      background: rgba(16,185,129,.12);
+      border-radius:16px;
+      padding:12px;
+      border:1px solid rgba(0,0,0,.06);
+    }
+    .reqName{ font-weight:1200; }
+    .reqKey{ opacity:.7; font-weight:900; margin-top:2px; font-size:12px; }
+    .reqBtns{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+    .tbtn{
+      border:none; border-radius:14px;
+      padding:10px 12px;
+      font-weight:1200;
+      cursor:pointer;
+    }
+    .tbtnPrimary{ background:#16a34a; color:white; }
+    .tbtnGhost{ background: rgba(0,0,0,.06); color:#122012; }
+
+    /* Task modal */
+    #overlay{
+      position:fixed; inset:0; display:none;
+      align-items:center; justify-content:center;
+      background: rgba(0,0,0,.45);
+      z-index:100; padding:18px;
+    }
+    .taskCard{
+      width:min(720px, 96vw);
+      background: rgba(255,255,255,.97);
+      border-radius:22px;
+      box-shadow:0 30px 90px rgba(0,0,0,.25);
+      padding:18px;
+      border:1px solid rgba(0,0,0,.08);
+    }
+    .taskTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .taskMeta{ opacity:.7; font-weight:900; font-size:12px; margin-bottom:6px; }
+    .taskTitle{ font-size:34px; font-weight:1200; margin:0; color:#162016; }
+    .taskBody{
+      margin-top:12px;
+      font-size:18px;
+      line-height:1.4;
+      font-weight:900;
+      color:#1b2f1a;
+      white-space:pre-wrap;
+    }
+    .taskBtns{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; justify-content:flex-end; }
+    .taskMsg{ margin-top:10px; opacity:.8; font-weight:900; }
+
+    /* Student request modal (same overlay card, different content) */
+    .bigNote{
+      font-weight:1100;
+      opacity:.9;
+      margin-top:6px;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px;">
+    <section class="boardShell">
+      <div class="topLine">
+        <div id="whoLine">—</div>
+        <div id="codeLine">Code: —</div>
+      </div>
+
+      <div id="roundTitle" class="roundTitle">Round 1</div>
+
+      <div id="catRow" class="cats"></div>
+      <div id="board" class="grid"></div>
+
+      <div id="msg" class="muted" style="margin-top:10px; text-align:center;"></div>
+    </section>
+  </main>
+
+  <!-- Teacher-only: Requests drawer -->
+  <button id="reqFab" class="reqFab">📥 Requests</button>
+  <aside id="reqDrawer" class="reqDrawer">
+    <div class="reqHead">
+      <div class="reqTitle">Student Requests</div>
+      <button id="reqClose" class="reqClose">Close</button>
+    </div>
+    <div class="muted" style="margin-top:6px;">Click “Assign” to send the task to ONLY that student.</div>
+    <div id="reqList" class="reqList"></div>
+  </aside>
+
+  <!-- Task / Request modal -->
+  <div id="overlay">
+    <div class="taskCard" role="dialog" aria-modal="true">
+      <div class="taskTop">
+        <div>
+          <div id="taskMeta" class="taskMeta">—</div>
+          <h2 id="taskTitle" class="taskTitle">—</h2>
+        </div>
+        <button id="closeTaskBtn" class="tbtn tbtnGhost">Close</button>
+      </div>
+
+      <div id="taskText" class="taskBody"></div>
+
+      <div id="choices" class="taskBtns"></div>
+      <div id="taskMsg" class="taskMsg"></div>
+    </div>
+  </div>
+
+  <script type="module" src="../js/game.js"></script>
+</body>
+</html>
