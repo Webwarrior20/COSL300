@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 8080;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const clientDist = path.join(__dirname, "client", "dist");
+const clientDist = path.join(__dirname, "dist");
 app.use(express.static(clientDist));
 
 // helper: find LAN ip

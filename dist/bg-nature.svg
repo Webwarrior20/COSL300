@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#e9fff3"/>
+      <stop offset="1" stop-color="#f7fff9"/>
+    </linearGradient>
+    <linearGradient id="hills" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#b8e7c8"/>
+      <stop offset="1" stop-color="#9ed7b5"/>
+    </linearGradient>
+    <linearGradient id="hills2" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#cbeed8"/>
+      <stop offset="1" stop-color="#b2dfc1"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)"/>
+
+  <g opacity="0.25">
+    <circle cx="200" cy="140" r="90" fill="#bdf1ff"/>
+    <circle cx="1400" cy="180" r="110" fill="#c7e9ff"/>
+    <circle cx="900" cy="90" r="70" fill="#d6f9ff"/>
+  </g>
+
+  <path d="M0 560 C 250 460, 520 520, 740 500 C 980 475, 1220 430, 1600 500 L 1600 900 L 0 900 Z" fill="url(#hills2)"/>
+  <path d="M0 610 C 260 520, 520 620, 780 600 C 1040 580, 1300 520, 1600 600 L 1600 900 L 0 900 Z" fill="url(#hills)"/>
+
+  <g opacity="0.5">
+    <path d="M170 660 C 155 610, 190 560, 210 520" stroke="#76c28a" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="210" cy="500" r="20" fill="#7bd18f"/>
+
+    <path d="M1380 700 C 1360 640, 1390 580, 1420 540" stroke="#76c28a" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="1425" cy="520" r="20" fill="#7bd18f"/>
+  </g>
+</svg>
