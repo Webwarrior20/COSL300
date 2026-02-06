@@ -697,20 +697,40 @@ function AdminPage() {
     (b.score ?? 0) - (a.score ?? 0)
   );
 
+  const copyJoinLink = async () => {
+    if (!joinLink) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(joinLink);
+        setMsg("Join link copied ✅");
+        return;
+      }
+    } catch {}
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = joinLink;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setMsg("Join link copied ✅");
+    } catch {
+      setMsg("Copy failed — select the link and copy manually.");
+    }
+  };
+
   return (
     <main className="page">
-      <section className="card" style={{ textAlign: "center", background: "rgba(130, 190, 160, .58)", borderRadius: 28 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 14, flexWrap: "wrap", textAlign: "left" }}>
-          <div>
-            <div style={{ opacity: 0.8, fontWeight: 900, color: "#21351e" }}>Teacher</div>
-            <div style={{ fontWeight: 1200, color: "#21351e" }}>{teacherEmail}</div>
-            <div style={{ background: "rgba(255,255,255,.28)", borderRadius: 18, padding: 12, marginTop: 10 }}>
-              <div className="mini"><span className="pill">Share this join link with students</span></div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
-                <input value={joinLink} readOnly style={{ flex: 1, minWidth: 280, padding: "10px 12px", borderRadius: 14, border: "1px solid rgba(0,0,0,.12)", background: "rgba(255,255,255,.78)", fontWeight: 900, color: "#1b2f1a" }} />
-                <button className="btn btn-ghost" onClick={async () => {
-                  try { await navigator.clipboard.writeText(joinLink); setMsg("Join link copied ✅"); } catch { setMsg("Copy failed — select the link and copy manually."); }
-                }}>COPY</button>
+      <section className="card lobby-card">
+        <div className="lobby-top">
+          <div className="lobby-teacher">
+            <div className="lobby-label">Teacher</div>
+            <div className="lobby-email">{teacherEmail}</div>
+            <div className="lobby-joinbox">
+              <div className="lobby-joinpill">Share this join link with students</div>
+              <div className="lobby-joinrow">
+                <input className="lobby-joininput" value={joinLink} readOnly />
+                <button className="btn btn-ghost" onClick={copyJoinLink}>COPY</button>
                 <a className="btn btn-ghost" href={joinLink} target="_blank" rel="noopener">OPEN</a>
               </div>
               <div className="mini" style={{ marginTop: 8 }}>Students enter their name + the 6-digit game code.</div>
@@ -719,36 +739,34 @@ function AdminPage() {
           <button className="btn btn-ghost" onClick={logout}>LOG OUT</button>
         </div>
 
-        <div style={{ fontSize: 54, fontWeight: 1200, margin: "10px 0 6px", color: "#294023" }}>Win Squares Lobby</div>
-        <div style={{ fontSize: 30, fontWeight: 1100, margin: "0 0 12px", color: "#294023" }}>
-          Game Code: {game?.code || "———"}
-        </div>
+        <div className="lobby-title">Win Squares Lobby</div>
+        <div className="lobby-code">Game Code: {game?.code || "———"}</div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
-          <div style={{ background: "rgba(255,255,255,.25)", borderRadius: 18, padding: 12, textAlign: "left" }}>
+        <div className="lobby-grid">
+          <div className="lobby-box">
             <div style={{ fontWeight: 1200 }}>Students Joined: {players.length}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <div className="lobby-pillgrid">
               {players.length === 0 && <div className="muted" style={{ gridColumn: "1/-1", textAlign: "center" }}>No students joined yet</div>}
               {players.map((p) => (
-                <div key={p.id} style={{ borderRadius: 999, padding: "10px 14px", background: "rgba(16,185,129,.55)", fontWeight: 1100, color: "#0b1b12" }}>
+                <div key={p.id} className="lobby-pill">
                   {p.name}{p.student_id ? ` (${p.student_id})` : ""}
                 </div>
               ))}
             </div>
           </div>
-          <div style={{ background: "rgba(255,255,255,.25)", borderRadius: 18, padding: 12, textAlign: "left" }}>
+          <div className="lobby-box">
             <div style={{ fontWeight: 1200 }}>Live Leaderboard</div>
             <div className="mini">Sorted by Tasks Completed → Score</div>
             {sorted.length === 0 && <div className="muted" style={{ marginTop: 8 }}>No data yet.</div>}
             {sorted.map((p) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 10px", borderRadius: 14, background: "rgba(255,255,255,.22)", marginTop: 8, fontWeight: 1000 }}>
+              <div key={p.id} className="lobby-row">
                 <div>{p.name}</div><div>⭐ {p.score ?? 0}</div>
               </div>
             ))}
           </div>
         </div>
 
-        <button className="big-btn big-btn-admin" style={{ marginTop: 16 }} disabled={!game || loading} onClick={startGame}>START GAME</button>
+        <button className="big-btn big-btn-admin lobby-start" disabled={!game || loading} onClick={startGame}>START GAME</button>
         <p className="muted" style={{ marginTop: 12 }}>{msg}</p>
       </section>
     </main>
@@ -770,6 +788,8 @@ function GamePage() {
   const [assignIds, setAssignIds] = useState([]);
   const [modalMode, setModalMode] = useState("select");
   const [assignedKeys, setAssignedKeys] = useState([]);
+  const [classPoints, setClassPoints] = useState(0);
+  const [classGoal, setClassGoal] = useState(5000);
 
   const dismissedTaskKeyRef = useRef(null);
   const lastAssignmentIdRef = useRef(null);
@@ -834,6 +854,38 @@ function GamePage() {
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq("game_id", g.id);
     if (error) console.log("updateBoardState", error);
+  };
+
+  const loadClassProgress = async (g) => {
+    const { data, error } = await sb
+      .from("class_progress")
+      .select("class_points, goal_points")
+      .eq("game_id", g.id)
+      .maybeSingle();
+    if (error) {
+      console.log("loadClassProgress", error);
+      return { class_points: 0, goal_points: 5000 };
+    }
+    if (!data) {
+      const insert = await sb.from("class_progress").insert([{
+        game_id: g.id,
+        class_points: 0,
+        goal_points: 5000
+      }]).select("class_points, goal_points").single();
+      return insert.data || { class_points: 0, goal_points: 5000 };
+    }
+    return data;
+  };
+
+  const syncClassProgress = async (g, totalPoints) => {
+    const { error } = await sb
+      .from("class_progress")
+      .upsert([{
+        game_id: g.id,
+        class_points: totalPoints,
+        goal_points: classGoal || 5000
+      }], { onConflict: "game_id" });
+    if (error) console.log("syncClassProgress", error);
   };
 
   const openStudentTask = (k, force = false) => {
@@ -944,6 +996,9 @@ function GamePage() {
       setState(s);
       const list = await loadPlayers(g);
       setPlayers(list);
+      const cp = await loadClassProgress(g);
+      setClassPoints(cp.class_points ?? 0);
+      setClassGoal(cp.goal_points ?? 5000);
 
       if (role === "student") {
         const pid = localStorage.getItem(LS_PLAYER_ID);
@@ -1081,6 +1136,15 @@ function GamePage() {
     };
   }, [game, role]);
 
+  useEffect(() => {
+    if (!game) return;
+    const total = players.reduce((sum, p) => sum + (p.score ?? 0), 0);
+    setClassPoints(total);
+    if (role === "teacher") {
+      syncClassProgress(game, total);
+    }
+  }, [players, game, role]);
+
   const renderStudentProgress = () => {
     const pid = localStorage.getItem(LS_PLAYER_ID);
     const studentId = localStorage.getItem(LS_STUDENT_ID);
@@ -1100,6 +1164,8 @@ function GamePage() {
   };
 
   const { score, pct, level, emoji, scale, studentId } = renderStudentProgress();
+  const classPct = Math.min(100, Math.round((classPoints / Math.max(1, classGoal)) * 100));
+  const classUnlocked = classPoints >= classGoal;
 
   const opened = new Set(state?.opened || []);
   const assignedSet = new Set(assignedKeys);
@@ -1171,6 +1237,17 @@ function GamePage() {
               <div className="sideTitle">Players</div>
               <div className="mini">Joined: {players.length}</div>
               <button className="tbtn tbtnWarn" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextRound}>Next Round</button>
+              <div style={{ marginTop: 12, padding: 10, borderRadius: 14, background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.08)" }}>
+                <div style={{ fontWeight: 1200 }}>Class Goal</div>
+                <div className="mini">Earn {classGoal} points to unlock the class prize</div>
+                <div className="progressBar">
+                  <div className="progressFill" style={{ width: `${classPct}%` }}></div>
+                </div>
+                <div className="treeLabel" style={{ marginTop: 8 }}>
+                  <div>{classPoints} / {classGoal}</div>
+                  <div>{classUnlocked ? "Class Prize Unlocked 🎉" : "Enter‑to‑Win"}</div>
+                </div>
+              </div>
               <div className="list">
                 {players.length === 0 && <div className="muted">No students yet.</div>}
                 {players.map((p) => (
@@ -1202,6 +1279,18 @@ function GamePage() {
                 <div className="progressFill" style={{ width: `${pct}%` }}></div>
               </div>
               <div className="mini" style={{ marginTop: 10 }}>Student ID: {studentId || "—"}</div>
+
+              <div style={{ marginTop: 14, padding: 10, borderRadius: 14, background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.08)" }}>
+                <div style={{ fontWeight: 1200 }}>Class Goal</div>
+                <div className="mini">Earn {classGoal} points to unlock the class prize</div>
+                <div className="progressBar">
+                  <div className="progressFill" style={{ width: `${classPct}%` }}></div>
+                </div>
+                <div className="treeLabel" style={{ marginTop: 8 }}>
+                  <div>{classPoints} / {classGoal}</div>
+                  <div>{classUnlocked ? "Class Prize Unlocked 🎉" : "Enter‑to‑Win"}</div>
+                </div>
+              </div>
             </div>
           )}
         </aside>
