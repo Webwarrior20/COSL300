@@ -553,8 +553,29 @@ function AdminPage() {
   const channelRef = useRef(null);
 
   const buildJoinUrl = async () => {
+    const host = window.location.hostname;
+    const isLocal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.startsWith("10.") ||
+      host.startsWith("192.168.") ||
+      host.startsWith("172.16.") ||
+      host.startsWith("172.17.") ||
+      host.startsWith("172.18.") ||
+      host.startsWith("172.19.") ||
+      host.startsWith("172.2") ||
+      host.startsWith("172.30.") ||
+      host.startsWith("172.31.");
+
+    if (!isLocal) {
+      return window.location.origin + "/join";
+    }
+
     try {
-      const r = await fetch("/api/ip", { cache: "no-store" });
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 1200);
+      const r = await fetch("/api/ip", { cache: "no-store", signal: controller.signal });
+      clearTimeout(t);
       const j = await r.json();
       const proto = window.location.protocol || "http:";
       const port = j.port || window.location.port || 8080;
