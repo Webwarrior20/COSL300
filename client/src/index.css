@@ -1,33 +1,42 @@
 :root{
-  --bgTop:#f3fbf7;
-  --bgMid:#f6f7ff;
-  --bgBot:#fff7f1;
+  /* Background greens */
+  --bgTop:#9BE398;
+  --bgMid:#8BC34A;
+  --bgBot:#388E3C;
 
-  --ink:#0f172a;
-  --muted:#475569;
+  /* Text */
+  --ink:#1B4332;           /* darker forest green for readability */
+  --muted:#4F772D;         /* soft earthy green */
 
-  --leaf:#22c55e;
-  --forest:#16a34a;
+  /* Primary greens */
+  --leaf:#8BC34A;          /* lime */
+  --forest:#388E3C;        /* dark green */
 
-  --sky:#38bdf8;
-  --ocean:#0ea5e9;
+  /* Accent highlight */
+  --sun:#F0CA11;           /* yellow */
 
-  --sun:#f59e0b;
-  --coral:#fb7185;
+  /* Remove blue/pink/purple vibe */
+  --sky:#8BC34A;
+  --ocean:#388E3C;
+  --coral:#F0CA11;
+  --violet:#8BC34A;
 
-  --violet:#8b5cf6;
+  /* Cards */
+  --card: rgba(255,255,255,.92);
+  --card2: rgba(255,255,255,.96);
 
-  --card: rgba(255,255,255,.86);
-  --card2: rgba(255,255,255,.92);
-  --stroke: rgba(15,23,42,.10);
-  --shadow: 0 20px 55px rgba(2, 6, 23, 0.12);
-  --shadow2: 0 12px 30px rgba(2, 6, 23, 0.10);
+  /* Borders / shadows */
+  --stroke: rgba(56,142,60,.20);
+  --shadow: 0 20px 55px rgba(56,142,60,.18);
+  --shadow2: 0 12px 30px rgba(56,142,60,.12);
 
-  --radius: 22px;
+  --radius: 24px;
 }
 
-*{ box-sizing:border-box; font-family: "Bangers", "Impact", "Arial Black", "Trebuchet MS", system-ui, sans-serif; }
-html,body,#root{ height:100%; margin:0; color:var(--ink); }
+*{
+  box-sizing:border-box;
+  font-family: "Poppins", "Segoe UI", system-ui, sans-serif;
+}
 
 body{
   background:
@@ -73,11 +82,11 @@ a{ color:inherit; text-decoration:none; }
   margin: 0 auto 16px;
   border-radius:999px;
   background:
-    radial-gradient(circle at 30% 30%, #ffffff, rgba(34,197,94,.18) 60%, rgba(56,189,248,.18));
+    radial-gradient(circle at 30% 30%, #ffffff, rgba(34,197,94,.18) 60%, rgba(56, 248, 117, 0.18));
   box-shadow: 0 16px 36px rgba(34,197,94,.18);
   display:grid;
   place-items:center;
-  border:1px solid rgba(15,23,42,.08);
+  border:1px solid rgba(45, 131, 89, 0.08);
 }
 .logo-emoji{ font-size:42px; }
 
@@ -89,8 +98,7 @@ a{ color:inherit; text-decoration:none; }
   font-size: clamp(42px, 5vw, 66px);
 }
 .headline .accent{
-  display:block;
-  background: linear-gradient(90deg, var(--forest), var(--ocean), var(--violet));
+  background: linear-gradient(90deg, #388E3C, #8BC34A, #F0CA11);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -132,7 +140,7 @@ a{ color:inherit; text-decoration:none; }
   background: linear-gradient(180deg, var(--leaf), var(--forest));
 }
 .big-btn-admin{
-  background: linear-gradient(180deg, var(--ocean), #2563eb);
+  background: linear-gradient(135deg, #388E3C, #8BC34A);
 }
 .btn-icon{
   font-size: 22px;
@@ -378,7 +386,7 @@ a{ color:inherit; text-decoration:none; }
   letter-spacing: .2px;
   cursor: pointer;
   color: #fff;
-  background: linear-gradient(180deg, #2f3f66, #1d2742);
+  background: linear-gradient(180deg, #2f6644, #20421d);
   box-shadow: 0 10px 24px rgba(2, 6, 23, .3);
 }
 .teacherMenuToggle.open{
@@ -404,7 +412,7 @@ a{ color:inherit; text-decoration:none; }
   transform: translateX(0);
 }
 .teacherSidebarNav{
-  background: #343457;
+  background: #345736;
   padding: 84px 10px 14px;
   display: flex;
   flex-direction: column;
@@ -422,7 +430,7 @@ a{ color:inherit; text-decoration:none; }
   cursor: pointer;
 }
 .teacherSidebarItem.active{
-  background: #f18a95;
+  background: #8af18a;
   color: #1f1222;
 }
 .teacherSidebarContent{
@@ -535,9 +543,9 @@ a{ color:inherit; text-decoration:none; }
   font-weight:1200;
   cursor:pointer;
 }
-.tbtnPrimary{ background:#16a34a; color:white; }
+.tbtnPrimary{ background:#16a34a; color:rgb(212, 210, 66); }
 .tbtnGhost{ background: rgba(0,0,0,.06); color:#122012; }
-.tbtnWarn{ background:#a61aa8; color:white; }
+.tbtnWarn{ background:#21a81a; color:rgb(231, 224, 94); }
 
 #overlay{
   position:fixed; inset:0; display:flex;

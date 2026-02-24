@@ -42,8 +42,8 @@ export default function HomePage() {
       <section className="card" style={{ textAlign: "center" }}>
         <div className="logo-bubble"><div className="logo-emoji">🟩</div></div>
         <h1 className="headline" style={{ marginBottom: 10 }}>
-          Classroom <span className="accent">Win Squares</span>
-        </h1>
+  <span className="accent">Win Squares</span>
+</h1>
         <p className="subhead">
           Teacher hosts the game. Students join with a <b>code</b> and complete challenges to win squares.
         </p>
