@@ -6,14 +6,21 @@ export default function GrowthPotAnimation({ score = 0 }) {
   const stage = safeScore < 2000 ? 0 : safeScore < 5000 ? 1 : safeScore < 8000 ? 2 : 3;
 
   const [showWaterBurst, setShowWaterBurst] = useState(false);
+  const [showPitcher, setShowPitcher] = useState(false);
   const prevWaterCount = useRef(waterCount);
 
   useEffect(() => {
     if (waterCount > prevWaterCount.current) {
-      setShowWaterBurst(true);
-      const t = setTimeout(() => setShowWaterBurst(false), 1300);
+      setShowPitcher(true);
+      const t1 = setTimeout(() => setShowWaterBurst(true), 500);
+      const t2 = setTimeout(() => setShowWaterBurst(false), 2100);
+      const t3 = setTimeout(() => setShowPitcher(false), 3000);
       prevWaterCount.current = waterCount;
-      return () => clearTimeout(t);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     }
     prevWaterCount.current = waterCount;
     return undefined;
@@ -56,13 +63,24 @@ export default function GrowthPotAnimation({ score = 0 }) {
         <path d="M104 91 L216 91 L197 176 L123 176 Z" fill="#c9915a" stroke="#6c4a2f" strokeWidth="1.5" />
         <path d="M121 176 L199 176" stroke="#6c4a2f" strokeWidth="1.2" />
 
-        {showWaterBurst && (
-          <g className="waterDrops">
-            <circle cx="270" cy="66" r="3" fill="#66c6ff" />
-            <circle cx="259" cy="74" r="2.6" fill="#66c6ff" />
-            <circle cx="248" cy="82" r="2.4" fill="#66c6ff" />
-            <circle cx="236" cy="90" r="2.2" fill="#66c6ff" />
-          </g>
+        {showPitcher && (
+          <>
+            <g className="pitcherGroup">
+              <rect x="250" y="40" width="44" height="20" rx="6" fill="#b8c4d2" stroke="#4c6172" strokeWidth="1.2" />
+              <path d="M252 42 H292 V36 H255 Z" fill="#d0dae6" stroke="#4c6172" strokeWidth="1.1" />
+              <path d="M292 50 L306 46 L308 50 L294 54 Z" fill="#9ba9b8" stroke="#4c6172" strokeWidth="1.1" />
+              <path d="M246 42 C236 44 236 58 246 60" fill="none" stroke="#4c6172" strokeWidth="2.2" strokeLinecap="round" />
+            </g>
+            {showWaterBurst && (
+              <g className="waterDrops">
+                <circle cx="300" cy="52" r="3" fill="#66c6ff" />
+                <circle cx="288" cy="62" r="2.8" fill="#66c6ff" />
+                <circle cx="274" cy="72" r="2.6" fill="#66c6ff" />
+                <circle cx="260" cy="82" r="2.4" fill="#66c6ff" />
+                <circle cx="246" cy="92" r="2.2" fill="#66c6ff" />
+              </g>
+            )}
+          </>
         )}
 
         {stage === 0 && (
@@ -90,10 +108,18 @@ export default function GrowthPotAnimation({ score = 0 }) {
             <path d="M160 92 C160 78 160 58 160 36" stroke="#2f6a3e" strokeWidth="4" strokeLinecap="round" fill="none" />
             <ellipse cx="147" cy="55" rx="11" ry="5" fill="#62ca78" transform="rotate(-32 147 55)" />
             <ellipse cx="173" cy="48" rx="11" ry="5" fill="#62ca78" transform="rotate(30 173 48)" />
-            <circle cx="160" cy="33" r="4.8" fill="#ffd166" stroke="#8b2b43" strokeWidth="1" />
-            <circle cx="154" cy="36" r="4.6" fill="#f87197" stroke="#8b2b43" strokeWidth="1" />
-            <circle cx="166" cy="36" r="4.6" fill="#f87197" stroke="#8b2b43" strokeWidth="1" />
-            <circle cx="160" cy="28" r="4.2" fill="#fb8fb1" stroke="#8b2b43" strokeWidth="1" />
+            <g className="flowerBloom">
+              <ellipse cx="160" cy="24" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" />
+              <ellipse cx="169" cy="28" rx="4.3" ry="7.4" fill="#ff7ea8" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(38 169 28)" />
+              <ellipse cx="173" cy="37" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(78 173 37)" />
+              <ellipse cx="166" cy="45" rx="4.3" ry="7.4" fill="#ff7ea8" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(124 166 45)" />
+              <ellipse cx="154" cy="45" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(236 154 45)" />
+              <ellipse cx="147" cy="37" rx="4.3" ry="7.4" fill="#ff7ea8" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(284 147 37)" />
+              <ellipse cx="151" cy="28" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(322 151 28)" />
+              <ellipse cx="160" cy="33" rx="5.4" ry="8.6" fill="#f04f87" stroke="#8b2b43" strokeWidth="1.1" />
+              <ellipse cx="160" cy="35" rx="3.6" ry="5.8" fill="#d93372" stroke="#8b2b43" strokeWidth="1" />
+              <circle cx="160" cy="35" r="1.8" fill="#ffd166" stroke="#8b2b43" strokeWidth="0.8" />
+            </g>
           </g>
         )}
       </svg>

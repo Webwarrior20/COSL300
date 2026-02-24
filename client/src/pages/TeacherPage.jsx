@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { sb } from "../supabase";
 
 const LS_GAME_ID = "ACTIVE_GAME_ID";
+const LS_TEACHER_SECTION = "TEACHER_SECTION";
 
 export default function TeacherPage() {
   const [teacherEmail, setTeacherEmail] = useState("");
+  const [teacherSection, setTeacherSection] = useState("");
   const [msg, setMsg] = useState("");
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -69,19 +71,19 @@ export default function TeacherPage() {
   const getGameById = async (id) => {
     const { data, error } = await sb
       .from("games")
-      .select("id,code,status,round,created_at")
+      .select("id,code,status,round,created_at,section_name,teacher_email")
       .eq("id", id)
       .maybeSingle();
     if (error) return null;
     return data || null;
   };
 
-  const createNewGame = async () => {
+  const createNewGame = async (email, section) => {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const { data: g, error } = await sb
       .from("games")
-      .insert([{ code, status: "lobby", round: 1 }])
-      .select("id,code,status,round")
+      .insert([{ code, status: "lobby", round: 1, section_name: section || null, teacher_email: email || null }])
+      .select("id,code,status,round,section_name,teacher_email")
       .single();
     if (error || !g) {
       console.log("CREATE GAME ERROR:", error);
@@ -98,7 +100,7 @@ export default function TeacherPage() {
     return g;
   };
 
-  const ensureLobbyGame = async () => {
+  const ensureLobbyGame = async (email, section) => {
     setMsg("Preparing game…");
     const savedId = localStorage.getItem(LS_GAME_ID);
     let g = null;
@@ -108,7 +110,7 @@ export default function TeacherPage() {
       else localStorage.removeItem(LS_GAME_ID);
     }
     if (!g) {
-      const fresh = await createNewGame();
+      const fresh = await createNewGame(email, section);
       if (!fresh) return;
       g = fresh;
       localStorage.setItem(LS_GAME_ID, g.id);
@@ -128,10 +130,13 @@ export default function TeacherPage() {
         return;
       }
       if (!alive) return;
-      setTeacherEmail(user.email || "Teacher");
+      const email = user.email || "Teacher";
+      const section = localStorage.getItem(LS_TEACHER_SECTION) || "";
+      setTeacherEmail(email);
+      setTeacherSection(section);
       const url = await buildJoinUrl();
       setJoinLink(url);
-      await ensureLobbyGame();
+      await ensureLobbyGame(email, section);
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -338,6 +343,7 @@ export default function TeacherPage() {
 
         <div className="lobby-title">Win Squares Lobby</div>
         <div className="lobby-code">Game Code: {game?.code || "———"}</div>
+        <div className="mini" style={{ marginTop: 6 }}>Section: {game?.section_name || teacherSection || "Not set"}</div>
 
         <div className="lobby-grid">
           <div className="lobby-box">

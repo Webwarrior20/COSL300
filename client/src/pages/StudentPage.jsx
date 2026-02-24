@@ -7,14 +7,29 @@ const LS_PLAYER_ID = "PLAYER_ID";
 const LS_GAME_CODE = "GAME_CODE";
 const LS_STUDENT_NAME = "STUDENT_NAME";
 const LS_STUDENT_NAME_KEY = "STUDENT_NAME_KEY";
+const LS_GROUPS_PREFIX = "TEACHER_GROUPS_";
 
 function useQuery() {
   return useMemo(() => new URLSearchParams(window.location.search), []);
 }
 
+function parseTaskSections(rawText) {
+  const text = String(rawText || "");
+  const factMatch = text.match(/Fun Fact:\s*([\s\S]*?)(?:\n\nTask:|$)/i);
+  const taskMatch = text.match(/Task:\s*([\s\S]*?)(?:\n\nPrize:|$)/i);
+  const prizeMatch = text.match(/Prize:\s*([\s\S]*?)$/i);
+
+  return {
+    fact: (factMatch?.[1] || "—").trim(),
+    task: (taskMatch?.[1] || "—").trim(),
+    prize: (prizeMatch?.[1] || "—").trim()
+  };
+}
+
 export default function StudentPage() {
   const query = useQuery();
   const role = query.get("role") || "student";
+  const isTeacher = role === "teacher";
   const code = query.get("code") || localStorage.getItem(LS_GAME_CODE);
 
   const [game, setGame] = useState(null);
@@ -29,10 +44,14 @@ export default function StudentPage() {
   const [assignedKeys, setAssignedKeys] = useState([]);
   const [classPoints, setClassPoints] = useState(0);
   const [classGoal, setClassGoal] = useState(5000);
+  const [studentGrowthTestIndex, setStudentGrowthTestIndex] = useState(-1);
   const [teacherSidebarOpen, setTeacherSidebarOpen] = useState(false);
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
   const [rewardPlayerId, setRewardPlayerId] = useState("");
   const [rewardPoints, setRewardPoints] = useState(100);
+  const [groupName, setGroupName] = useState("");
+  const [groupMemberIds, setGroupMemberIds] = useState([]);
+  const [teacherGroups, setTeacherGroups] = useState([]);
 
   const dismissedTaskKeyRef = useRef(null);
   const lastAssignmentIdRef = useRef(null);
@@ -52,7 +71,7 @@ export default function StudentPage() {
   const loadGame = async () => {
     const { data, error } = await sb
       .from("games")
-      .select("id,code,status,round")
+      .select("id,code,status,round,section_name,teacher_email")
       .eq("code", code)
       .maybeSingle();
     if (error) console.log(error);
@@ -117,6 +136,20 @@ export default function StudentPage() {
         goal_points: classGoal || 5000
       }], { onConflict: "game_id" });
     if (error) console.log("syncClassProgress", error);
+  };
+
+  const syncSectionTotals = async (g, totalPoints) => {
+    if (!g?.section_name) return;
+    const { error } = await sb
+      .from("class_totals")
+      .upsert([{
+        section_name: g.section_name,
+        teacher_email: g.teacher_email || null,
+        total_points: totalPoints,
+        goal_points: classGoal || 5000,
+        updated_at: new Date().toISOString()
+      }], { onConflict: "section_name" });
+    if (error) console.log("syncSectionTotals", error);
   };
 
   const upsertStudentTotals = async (nameKey, fullName, score, tasksCompleted = 0) => {
@@ -394,6 +427,7 @@ export default function StudentPage() {
     setClassPoints(total);
     if (role === "teacher") {
       syncClassProgress(game, total);
+      syncSectionTotals(game, total);
     }
   }, [players, game, role]);
 
@@ -419,6 +453,26 @@ export default function StudentPage() {
     }
   }, [players, role, rewardPlayerId]);
 
+  useEffect(() => {
+    if (!isTeacher || !game?.id) return;
+    const raw = localStorage.getItem(`${LS_GROUPS_PREFIX}${game.id}`);
+    if (!raw) {
+      setTeacherGroups([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      setTeacherGroups(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setTeacherGroups([]);
+    }
+  }, [isTeacher, game?.id]);
+
+  useEffect(() => {
+    if (!isTeacher || !game?.id) return;
+    localStorage.setItem(`${LS_GROUPS_PREFIX}${game.id}`, JSON.stringify(teacherGroups));
+  }, [isTeacher, game?.id, teacherGroups]);
+
   const renderStudentProgress = () => {
     const pid = localStorage.getItem(LS_PLAYER_ID);
     const studentName = localStorage.getItem(LS_STUDENT_NAME);
@@ -436,12 +490,21 @@ export default function StudentPage() {
   };
 
   const { score, pct, level, studentName } = renderStudentProgress();
-  const classPct = Math.min(100, Math.round((classPoints / Math.max(1, classGoal)) * 100));
-  const classUnlocked = classPoints >= classGoal;
+  const studentTestScores = [0, 2000, 5000, 8000, 10000];
+  const displayStudentScore = studentGrowthTestIndex >= 0 ? studentTestScores[studentGrowthTestIndex] : score;
+  const displayStudentPct = Math.round((displayStudentScore / 10000) * 100);
+  const displayStudentLevel =
+    displayStudentScore >= 10000 ? "Full Bloom" :
+    displayStudentScore >= 8000 ? "Flowering Plant" :
+    displayStudentScore >= 5000 ? "Growing Plant" :
+    displayStudentScore >= 2000 ? "Sprout" : "Seed";
+
+  const displayClassPoints = classPoints;
+  const classPct = Math.min(100, Math.round((displayClassPoints / Math.max(1, classGoal)) * 100));
+  const classUnlocked = displayClassPoints >= classGoal;
 
   const opened = new Set(state?.opened || []);
   const assignedSet = new Set(assignedKeys);
-  const isTeacher = role === "teacher";
 
   const nextRound = async () => {
     if (!game) return;
@@ -484,6 +547,33 @@ export default function StudentPage() {
     setMsg(`Awarded ${add} points to ${target.name}.`);
   };
 
+  const toggleGroupMember = (playerId) => {
+    setGroupMemberIds((prev) => {
+      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
+      if (prev.length >= 5) return prev;
+      return [...prev, playerId];
+    });
+  };
+
+  const createGroup = () => {
+    const selected = players.filter((p) => groupMemberIds.includes(p.id));
+    if (selected.length !== 5) {
+      setMsg("Select exactly 5 students to create a group.");
+      return;
+    }
+    const cleanName = groupName.trim() || `Group ${teacherGroups.length + 1}`;
+    const newGroup = {
+      id: `${Date.now()}`,
+      name: cleanName,
+      memberIds: selected.map((p) => p.id),
+      memberNames: selected.map((p) => p.name)
+    };
+    setTeacherGroups((prev) => [...prev, newGroup]);
+    setGroupName("");
+    setGroupMemberIds([]);
+    setMsg(`Created group "${cleanName}" with 5 students.`);
+  };
+
   const nextDayColumn = async () => {
     if (!game || !state) return;
     const next = Math.min(dayColumn + 1, cats.length - 1);
@@ -500,6 +590,8 @@ export default function StudentPage() {
   const subTitle = (game?.status === "started")
     ? (isTeacher ? "One column per day (left to right). 500-point tiles are take-home for all students." : "Wait for your teacher to send you a challenge.")
     : "Waiting for teacher to start the game…";
+  const activeTaskValue = activeTaskKey ? parseTaskKey(activeTaskKey).value : 0;
+  const taskSections = parseTaskSections(activeTaskKey ? getTaskTextByKey(activeTaskKey) : "");
 
   return (
     <main className="page" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
@@ -555,7 +647,7 @@ export default function StudentPage() {
                   <div className="progressFill" style={{ width: `${classPct}%` }}></div>
                 </div>
                 <div className="treeLabel" style={{ marginTop: 8 }}>
-                  <div>{classPoints} / {classGoal}</div>
+                  <div>{displayClassPoints} / {classGoal}</div>
                   <div>{classUnlocked ? "Class Prize Unlocked 🎉" : "Enter‑to‑Win"}</div>
                 </div>
               </div>
@@ -575,13 +667,20 @@ export default function StudentPage() {
             <div>
               <div className="sideTitle">My Seed</div>
               <div className="mini">Seed in pot: grows as points increase (full at 10,000).</div>
-              <GrowthPotAnimation score={score} />
+              <GrowthPotAnimation score={displayStudentScore} />
+              <button
+                className="tbtn tbtnGhost"
+                style={{ width: "100%", marginTop: 8 }}
+                onClick={() => setStudentGrowthTestIndex((prev) => (prev >= studentTestScores.length - 1 ? -1 : prev + 1))}
+              >
+                {studentGrowthTestIndex >= 0 ? "Test Growth (Next Stage)" : "Test Growth"}
+              </button>
               <div className="treeLabel">
-                <div>{score} / 10000</div>
-                <div>{level}</div>
+                <div>{displayStudentScore} / 10000</div>
+                <div>{displayStudentLevel}</div>
               </div>
               <div className="progressBar">
-                <div className="progressFill" style={{ width: `${pct}%` }}></div>
+                <div className="progressFill" style={{ width: `${displayStudentPct}%` }}></div>
               </div>
               <div className="mini" style={{ marginTop: 10 }}>Student: {studentName}</div>
 
@@ -592,7 +691,7 @@ export default function StudentPage() {
                   <div className="progressFill" style={{ width: `${classPct}%` }}></div>
                 </div>
                 <div className="treeLabel" style={{ marginTop: 8 }}>
-                  <div>{classPoints} / {classGoal}</div>
+                  <div>{displayClassPoints} / {classGoal}</div>
                   <div>{classUnlocked ? "Class Prize Unlocked 🎉" : "Enter‑to‑Win"}</div>
                 </div>
               </div>
@@ -625,6 +724,13 @@ export default function StudentPage() {
                 onClick={() => setTeacherSidebarTab("reward")}
               >
                 Reward Student
+              </button>
+              <button
+                type="button"
+                className={`teacherSidebarItem ${teacherSidebarTab === "groups" ? "active" : ""}`}
+                onClick={() => setTeacherSidebarTab("groups")}
+              >
+                Groups (5)
               </button>
             </div>
             <div className="teacherSidebarContent">
@@ -677,6 +783,48 @@ export default function StudentPage() {
                   </button>
                 </div>
               )}
+              {teacherSidebarTab === "groups" && (
+                <div>
+                  <div className="sideTitle">Create Group of 5</div>
+                  <label className="field" style={{ marginTop: 8 }}>
+                    <span>Group Name</span>
+                    <input
+                      className="input"
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      placeholder="e.g., Team Maple"
+                    />
+                  </label>
+                  <div className="mini" style={{ marginTop: 6 }}>Select exactly 5 students</div>
+                  <div className="list" style={{ maxHeight: 240, marginTop: 8 }}>
+                    {players.map((p) => (
+                      <label key={p.id} className="pRow" style={{ cursor: "pointer" }}>
+                        <div>{p.name}</div>
+                        <input
+                          type="checkbox"
+                          checked={groupMemberIds.includes(p.id)}
+                          onChange={() => toggleGroupMember(p.id)}
+                        />
+                      </label>
+                    ))}
+                    {players.length === 0 && <div className="mini">No students yet.</div>}
+                  </div>
+                  <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={createGroup}>
+                    Create Group
+                  </button>
+
+                  <div className="mini" style={{ marginTop: 10, fontWeight: 1200 }}>Saved Groups</div>
+                  <div className="list" style={{ maxHeight: 220, marginTop: 6 }}>
+                    {teacherGroups.map((g) => (
+                      <div key={g.id} className="pill">
+                        <div style={{ fontWeight: 1200 }}>{g.name}</div>
+                        <div className="pillMini">{g.memberNames.join(", ")}</div>
+                      </div>
+                    ))}
+                    {teacherGroups.length === 0 && <div className="mini">No groups created yet.</div>}
+                  </div>
+                </div>
+              )}
             </div>
           </aside>
         </>
@@ -684,34 +832,51 @@ export default function StudentPage() {
 
       {overlayOpen && (
         <div id="overlay">
-          <div className="taskCard" role="dialog" aria-modal="true">
+          <div className="taskCard taskCardGame" role="dialog" aria-modal="true">
             <div className="taskTop">
               <div>
                 <div className="taskMeta">{activeTaskKey ? `Round ${parseTaskKey(activeTaskKey).round} • ${parseTaskKey(activeTaskKey).cat} • ${parseTaskKey(activeTaskKey).value}` : "—"}</div>
                 <h2 className="taskTitle">{activeTaskKey ? `${parseTaskKey(activeTaskKey).cat} — ${parseTaskKey(activeTaskKey).value} pts` : "—"}</h2>
               </div>
-              <button className="tbtn tbtnGhost" onClick={() => {
+              <button className="taskCloseBtn" onClick={() => {
                 if (isTeacher && state?.current_task) closeTask(false);
                 else {
                   dismissedTaskKeyRef.current = activeTaskKey;
                   setOverlayOpen(false);
                 }
-              }}>Close</button>
+              }}>✕</button>
             </div>
 
-            <div className="taskBody">{activeTaskKey ? getTaskTextByKey(activeTaskKey) : ""}</div>
+            <div className="taskSectionCard">
+              <div className="taskSectionTitle">Fun Fact</div>
+              <div className="taskBody">{taskSections.fact}</div>
+            </div>
+
+            <div className="taskSectionCard">
+              <div className="taskSectionTitle">Task</div>
+              <div className="taskBody">{taskSections.task}</div>
+            </div>
+
+            <div className="taskPrizePanel">
+              <div className="taskPrizeIcon">🏆</div>
+              <div>
+                <div className="taskPrizeLabel">Prize</div>
+                <div className="taskPrizeText">{taskSections.prize}</div>
+                <div className="taskPrizePoints">{activeTaskValue || "—"} Points</div>
+              </div>
+            </div>
 
             {isTeacher && modalMode === "select" && (
               <>
-                {parseTaskKey(activeTaskKey || "").value !== 500 && (
+                {activeTaskValue !== 500 && (
                   <div className="assignHint">100-400: in-school tasks. This task will be shown to all students.</div>
                 )}
-                {parseTaskKey(activeTaskKey || "").value === 500 && (
+                {activeTaskValue === 500 && (
                   <div className="assignHint">500-point task: take-home assignment, sent to all students.</div>
                 )}
                 <div className="taskBtns">
                   <button className="tbtn tbtnPrimary" onClick={showToAll}>
-                    {parseTaskKey(activeTaskKey || "").value === 500 ? "Assign Take-Home to ALL" : "Show to ALL"}
+                    {activeTaskValue === 500 ? "Assign Take-Home to ALL" : "Show to ALL"}
                   </button>
                 </div>
               </>

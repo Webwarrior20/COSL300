@@ -5,7 +5,9 @@ export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [sectionName, setSectionName] = useState("");
   const [msg, setMsg] = useState("");
+  const LS_TEACHER_SECTION = "TEACHER_SECTION";
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => {
@@ -14,7 +16,7 @@ export default function HomePage() {
   }, []);
 
   const login = async () => {
-    if (!email || !password) return setMsg("Enter email + password.");
+    if (!email || !password || !sectionName.trim()) return setMsg("Enter email, password, and section name.");
     setMsg("Logging in...");
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
@@ -26,14 +28,16 @@ export default function HomePage() {
       }
       return;
     }
+    localStorage.setItem(LS_TEACHER_SECTION, sectionName.trim());
     window.location.href = "/admin";
   };
 
   const signup = async () => {
-    if (!email || !password) return setMsg("Enter email + password.");
+    if (!email || !password || !sectionName.trim()) return setMsg("Enter email, password, and section name.");
     setMsg("Signing up...");
     const { error } = await sb.auth.signUp({ email, password });
     if (error) return setMsg(error.message || "Signup failed.");
+    localStorage.setItem(LS_TEACHER_SECTION, sectionName.trim());
     setMsg("Account created ✅ Now LOGIN (or confirm email if required).");
   };
 
@@ -62,6 +66,10 @@ export default function HomePage() {
             <label className="field">
               <span>Email</span>
               <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="name@email.com" autoComplete="email" />
+            </label>
+            <label className="field">
+              <span>Section Name</span>
+              <input value={sectionName} onChange={(e) => setSectionName(e.target.value)} type="text" placeholder="e.g., Grade 4A" />
             </label>
             <label className="field">
               <span>Password</span>
