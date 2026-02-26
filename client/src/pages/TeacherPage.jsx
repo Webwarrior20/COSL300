@@ -3,6 +3,7 @@ import { sb } from "../supabase";
 
 const LS_GAME_ID = "ACTIVE_GAME_ID";
 const LS_TEACHER_SECTION = "TEACHER_SECTION";
+const LS_GROUPS_PREFIX = "TEACHER_GROUPS_";
 
 export default function TeacherPage() {
   const [teacherEmail, setTeacherEmail] = useState("");
@@ -16,6 +17,9 @@ export default function TeacherPage() {
   const [sidebarTab, setSidebarTab] = useState("students");
   const [rewardPlayerId, setRewardPlayerId] = useState("");
   const [rewardPoints, setRewardPoints] = useState(100);
+  const [groupName, setGroupName] = useState("");
+  const [groupMemberIds, setGroupMemberIds] = useState([]);
+  const [groups, setGroups] = useState([]);
   const pollRef = useRef(null);
   const channelRef = useRef(null);
 
@@ -169,6 +173,26 @@ export default function TeacherPage() {
     }
   }, [players, rewardPlayerId]);
 
+  useEffect(() => {
+    if (!game?.id) return;
+    const raw = localStorage.getItem(`${LS_GROUPS_PREFIX}${game.id}`);
+    if (!raw) {
+      setGroups([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      setGroups(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setGroups([]);
+    }
+  }, [game?.id]);
+
+  useEffect(() => {
+    if (!game?.id) return;
+    localStorage.setItem(`${LS_GROUPS_PREFIX}${game.id}`, JSON.stringify(groups));
+  }, [game?.id, groups]);
+
   const startGame = async () => {
     if (!game) return;
     setMsg("Starting game…");
@@ -220,12 +244,12 @@ export default function TeacherPage() {
     }
   };
 
-  const rewardStudent = async () => {
+  const updateStudentScore = async (delta) => {
     if (!game || !rewardPlayerId) return;
     const target = players.find((p) => p.id === rewardPlayerId);
     if (!target) return;
 
-    const nextScore = (target.score || 0) + Number(rewardPoints || 0);
+    const nextScore = Math.max(0, (target.score || 0) + Number(delta || 0));
     const { error } = await sb
       .from("players")
       .update({ score: nextScore })
@@ -240,7 +264,47 @@ export default function TeacherPage() {
     setPlayers((prev) => prev.map((p) => (
       p.id === rewardPlayerId ? { ...p, score: nextScore } : p
     )));
-    setMsg(`Awarded ${rewardPoints} points to ${target.name}.`);
+    return { target, nextScore };
+  };
+
+  const rewardStudent = async () => {
+    const result = await updateStudentScore(Number(rewardPoints || 0));
+    if (result?.target) setMsg(`Awarded ${rewardPoints} points to ${result.target.name}.`);
+  };
+
+  const takeBackAward = async () => {
+    const result = await updateStudentScore(-Number(rewardPoints || 0));
+    if (result?.target) setMsg(`Took back ${rewardPoints} points from ${result.target.name}.`);
+  };
+
+  const toggleGroupMember = (playerId) => {
+    setGroupMemberIds((prev) => {
+      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
+      if (prev.length >= 5) return prev;
+      return [...prev, playerId];
+    });
+  };
+
+  const createGroup = () => {
+    if (groupMemberIds.length !== 5) {
+      setMsg("Select exactly 5 students to form a group.");
+      return;
+    }
+    const selected = players.filter((p) => groupMemberIds.includes(p.id));
+    const name = groupName.trim() || `Group ${groups.length + 1}`;
+    const next = [
+      ...groups,
+      {
+        id: `${Date.now()}`,
+        name,
+        memberIds: selected.map((p) => p.id),
+        memberNames: selected.map((p) => p.name)
+      }
+    ];
+    setGroups(next);
+    setGroupName("");
+    setGroupMemberIds([]);
+    setMsg(`Created ${name}.`);
   };
 
   return (
@@ -268,6 +332,13 @@ export default function TeacherPage() {
             onClick={() => setSidebarTab("reward")}
           >
             Reward Student
+          </button>
+          <button
+            type="button"
+            className={`teacherSidebarItem ${sidebarTab === "groups" ? "active" : ""}`}
+            onClick={() => setSidebarTab("groups")}
+          >
+            Form Group
           </button>
         </div>
         <div className="teacherSidebarContent">
@@ -318,6 +389,51 @@ export default function TeacherPage() {
               <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={rewardStudent} disabled={!players.length}>
                 Award Points
               </button>
+              <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={takeBackAward} disabled={!players.length}>
+                Take Back Award
+              </button>
+            </div>
+          )}
+          {sidebarTab === "groups" && (
+            <div>
+              <div className="sideTitle">Form Group (5 students)</div>
+              <label className="field" style={{ marginTop: 8 }}>
+                <span>Group Name</span>
+                <input
+                  className="input"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="e.g., Team Maple"
+                />
+              </label>
+              <div className="mini" style={{ marginTop: 6 }}>Select exactly 5 students</div>
+              <div className="list" style={{ maxHeight: 220, marginTop: 8 }}>
+                {players.map((p) => (
+                  <label key={p.id} className="pRow" style={{ cursor: "pointer" }}>
+                    <div>{p.name}</div>
+                    <input
+                      type="checkbox"
+                      checked={groupMemberIds.includes(p.id)}
+                      onChange={() => toggleGroupMember(p.id)}
+                    />
+                  </label>
+                ))}
+                {players.length === 0 && <div className="mini">No students yet.</div>}
+              </div>
+              <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={createGroup} disabled={players.length < 5}>
+                Create Group
+              </button>
+
+              <div className="mini" style={{ marginTop: 10, fontWeight: 1200 }}>Formed Groups</div>
+              <div className="list" style={{ maxHeight: 220, marginTop: 6 }}>
+                {groups.map((g) => (
+                  <div key={g.id} className="pill">
+                    <div style={{ fontWeight: 1200 }}>{g.name}</div>
+                    <div className="pillMini">{g.memberNames.join(", ")}</div>
+                  </div>
+                ))}
+                {groups.length === 0 && <div className="mini">No groups formed yet.</div>}
+              </div>
             </div>
           )}
         </div>
