@@ -35,7 +35,7 @@
 
 *{
   box-sizing:border-box;
-  font-family: "Poppins", "Segoe UI", system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 body{
@@ -482,16 +482,28 @@ a{ color:inherit; text-decoration:none; }
 }
 .cats{ display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; margin-bottom:10px; }
 .cat{
-  border-radius:14px; padding:10px 12px; text-align:center;
-  background: rgba(15,23,42,.08);
-  border:1px solid rgba(15,23,42,.12);
-  font-weight:1100; color:#1b2f1a; font-size:14px;
+  border-radius:14px;
+  padding:16px 12px;
+  text-align:center;
+
+  background:#388E3C;
+  color:#ffffff;
+
+  font-weight:700;
+  font-size:18px;
+
+  letter-spacing:.5px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 .grid{ display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; padding-bottom:8px; }
 .cell{
   border-radius:16px; padding:16px 10px; text-align:center;
   background: linear-gradient(180deg, #ffeaa7, #ffd86b);
-  font-weight:1200; color:#b42318;
+  font-weight:700;
+  font-size:15px; color:#164a0d;
   cursor:pointer; user-select:none;
   border:2px solid rgba(180,35,24,.2);
   box-shadow: 0 8px 18px rgba(0,0,0,.12);
@@ -519,7 +531,7 @@ a{ color:inherit; text-decoration:none; }
   position:sticky;
   top:14px;
 }
-.sideTitle{ font-weight:1200; font-size:16px; }
+.sideTitle{ font-weight:bold; font-size:16px; }
 .mini{ font-size:12px; font-weight:900; opacity:.75; }
 .list{ margin-top:12px; display:flex; flex-direction:column; gap:10px; max-height:560px; overflow:auto; padding-right:6px; }
 .pRow{
@@ -540,12 +552,12 @@ a{ color:inherit; text-decoration:none; }
 .tbtn{
   border:none; border-radius:14px;
   padding:8px 10px;
-  font-weight:1200;
+  font-weight:bold;
   cursor:pointer;
 }
-.tbtnPrimary{ background:#16a34a; color:rgb(212, 210, 66); }
+.tbtnPrimary{ background:#16a34a; color:rgb(251, 251, 244); }
 .tbtnGhost{ background: rgba(0,0,0,.06); color:#122012; }
-.tbtnWarn{ background:#21a81a; color:rgb(231, 224, 94); }
+.tbtnWarn{ background:#21a81a; color:rgb(251, 251, 244); }
 
 #overlay{
   position:fixed; inset:0; display:flex;
@@ -555,95 +567,131 @@ a{ color:inherit; text-decoration:none; }
 }
 .taskCard{
   width:min(760px, 96vw);
-  border-radius:30px;
-  box-shadow:0 30px 90px rgba(0,0,0,.35);
-  padding:18px;
-  border:1px solid rgba(255,255,255,.45);
-}
-.taskCardGame{
-  background: linear-gradient(165deg, #8de8ff 0%, #6fd9f9 46%, #70c7ff 100%);
-  outline: 4px solid rgba(255,255,255,.78);
-}
-.taskTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
-.taskMeta{ color:#1d4b8f; font-weight:1000; font-size:13px; margin-bottom:6px; }
-.taskTitle{
-  font-size:40px;
-  line-height:1;
-  font-weight:1200;
-  letter-spacing:.8px;
-  margin:0;
-  color:#fff;
-  text-transform:uppercase;
-  text-shadow: 0 2px 0 #3068b2, 0 4px 0 rgba(33,80,140,.32);
-}
-.taskSectionCard{
-  margin-top:12px;
   border-radius:24px;
-  background: rgba(221,255,255,.62);
-  border:1px solid rgba(255,255,255,.78);
-  padding:14px 16px;
+  box-shadow:0 25px 60px rgba(0,0,0,.15);
+  padding:22px;
+  border:1px solid rgba(0,0,0,.06);
+  background:#ffffff;
 }
+
+/* Softer, muted green background */
+.taskCardGame{
+  background: linear-gradient(180deg, #f6fff5 0%, #edf8ed 100%);
+  outline:none;
+}
+
+/* Meta text */
+.taskMeta{
+  color:#388E3C;
+  font-weight:600;
+  font-size:14px;
+  margin-bottom:8px;
+  letter-spacing:.4px;
+}
+
+/* Main Title */
+.taskTitle{
+  font-size:34px;
+  line-height:1.1;
+  font-weight:700;
+  letter-spacing:.5px;
+  margin:0;
+  color:#1e2a1f;
+  text-transform:none;
+  text-shadow:none;
+}
+
+/* Section cards (Fun Fact + Task) */
+.taskSectionCard{
+  margin-top:18px;
+  border-radius:18px;
+  background:#ffffff;
+  border:1px solid rgba(56,142,60,.12);
+  padding:16px 18px;
+}
+
+/* Section headers */
 .taskSectionTitle{
-  font-weight:1200;
-  color:#0d3e7a;
-  margin-bottom:6px;
-  font-size:18px;
+  font-weight:600;
+  color:#388E3C;
+  margin-bottom:8px;
+  font-size:16px;
+  text-transform:uppercase;
+  letter-spacing:.6px;
 }
+
+/* Body text */
 .taskBody{
   margin-top:0;
-  font-size:24px;
-  line-height:1.35;
-  font-weight:1000;
-  color:#154364;
+  font-size:20px;
+  line-height:1.5;
+  font-weight:600;
+  color:#2d3a2f;
   white-space:pre-wrap;
 }
+
+/* Prize panel — calmer */
 .taskPrizePanel{
-  margin-top:14px;
-  border-radius:22px;
-  padding:14px 16px;
-  background: linear-gradient(160deg, #2f8ef7 0%, #2856c9 100%);
-  border:2px solid rgba(255,255,255,.46);
-  box-shadow: inset 0 0 0 2px rgba(19,60,150,.35);
+  margin-top:20px;
+  border-radius:18px;
+  padding:16px 18px;
+  background:#388E3C;
+  border:none;
+  box-shadow:0 10px 25px rgba(56,142,60,.25);
   display:flex;
   align-items:center;
-  gap:14px;
-  color:#fff;
+  gap:16px;
+  color:#ffffff;
 }
+
 .taskPrizeIcon{
-  font-size:58px;
+  font-size:48px;
   line-height:1;
-  filter: drop-shadow(0 8px 12px rgba(0,0,0,.35));
+  filter:none;
 }
+
 .taskPrizeLabel{
-  font-size:24px;
-  font-weight:1200;
+  font-size:20px;
+  font-weight:700;
   line-height:1;
-  text-transform:uppercase;
+  text-transform:none;
 }
+
 .taskPrizeText{
   margin-top:4px;
-  font-size:17px;
-  font-weight:1000;
-  opacity:.95;
+  font-size:20px;
+  font-weight:bold;
+  opacity:.9;
+  color:#efef81;
 }
+
 .taskPrizePoints{
   margin-top:6px;
-  font-size:30px;
-  font-weight:1200;
-  line-height:1;
+  font-size:15px;
+  font-weight:700;
 }
-.taskBtns{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; justify-content:flex-end; }
+
+/* Buttons */
+.taskBtns{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:20px;
+  justify-content:flex-end;
+}
+
+/* Close button — not neon */
 .taskCloseBtn{
   border:none;
-  width:54px;
-  height:54px;
+  width:46px;
+  height:46px;
   border-radius:50%;
   cursor:pointer;
-  background: linear-gradient(160deg, #ff965f, #ff6e3d);
-  color:#fff;
-  font-size:24px;
-  font-weight:1200;
-  box-shadow: 0 10px 24px rgba(0,0,0,.24);
+  background:#F0CA11;
+  color:#1e2a1f;
+  font-size:20px;
+  font-weight:700;
+  box-shadow:0 6px 16px rgba(0,0,0,.15);
 }
 .assignSelect{
   width:100%;
@@ -658,7 +706,7 @@ a{ color:inherit; text-decoration:none; }
 .assignHint{
   font-size:13px;
   font-weight:900;
-  color:#1a4f79;
+  color:#125527;
   margin-top:6px;
 }
 
