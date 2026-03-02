@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { sb } from "../supabase";
-import { ROUND_CONFIG, VALUES, getTaskTextByKey, parseTaskKey } from "../assets/task";
+import { VALUES, parseTaskKey } from "../assets/task";
+import { getRoundConfig, getTaskEntry, getTaskTextFromEntry, loadPublishedGameContent } from "../lib/gameContent";
 import GrowthPotAnimation from "../components/GrowthPotAnimation";
 
 const LS_PLAYER_ID = "PLAYER_ID";
@@ -52,6 +53,7 @@ export default function StudentPage() {
   const [groupName, setGroupName] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState([]);
   const [teacherGroups, setTeacherGroups] = useState([]);
+  const [contentData, setContentData] = useState(null);
 
   const dismissedTaskKeyRef = useRef(null);
   const lastAssignmentIdRef = useRef(null);
@@ -62,7 +64,7 @@ export default function StudentPage() {
   const chAssignRef = useRef(null);
   const pollRef = useRef(null);
 
-  const cfg = game ? (ROUND_CONFIG[game.round] || ROUND_CONFIG[1]) : ROUND_CONFIG[1];
+  const cfg = getRoundConfig(contentData, game?.round || 1);
   const cats = cfg.cats;
   const dayColumn = Math.min(Math.max(state?.day_column ?? 0, 0), Math.max(cats.length - 1, 0));
 
@@ -76,6 +78,11 @@ export default function StudentPage() {
       .maybeSingle();
     if (error) console.log(error);
     return data || null;
+  };
+
+  const loadContent = async () => {
+    const content = await loadPublishedGameContent(sb);
+    setContentData(content);
   };
 
   const loadState = async (g) => {
@@ -269,6 +276,7 @@ export default function StudentPage() {
       }
       if (!alive) return;
       setGame(g);
+      await loadContent();
       const s = await loadState(g);
       if (!s) {
         setMsg("Board state missing. (Create board_state row for this game.)");
@@ -524,13 +532,15 @@ export default function StudentPage() {
     setMsg("");
   };
 
-  const rewardStudentFromSidebar = async () => {
+  const updateStudentScoreFromSidebar = async (delta) => {
     if (!game || !rewardPlayerId) return;
     const target = players.find((p) => p.id === rewardPlayerId);
     if (!target) return;
-    const add = Number(rewardPoints) || 0;
-    const nextScore = (target.score || 0) + add;
-    const nextTasks = (target.tasks_completed || 0) + 1;
+    const add = Number(delta) || 0;
+    const nextScore = Math.max(0, (target.score || 0) + add);
+    const nextTasks = add >= 0
+      ? (target.tasks_completed || 0) + 1
+      : Math.max(0, (target.tasks_completed || 0) - 1);
     const { error } = await sb
       .from("players")
       .update({ score: nextScore, tasks_completed: nextTasks })
@@ -544,7 +554,17 @@ export default function StudentPage() {
       p.id === rewardPlayerId ? { ...p, score: nextScore, tasks_completed: nextTasks } : p
     )));
     await upsertStudentTotals(normalizeNameKey(target.name), target.name, nextScore, nextTasks);
-    setMsg(`Awarded ${add} points to ${target.name}.`);
+    return { target, add };
+  };
+
+  const rewardStudentFromSidebar = async () => {
+    const result = await updateStudentScoreFromSidebar(Number(rewardPoints) || 0);
+    if (result?.target) setMsg(`Awarded ${Math.abs(result.add)} points to ${result.target.name}.`);
+  };
+
+  const takeBackRewardFromSidebar = async () => {
+    const result = await updateStudentScoreFromSidebar(-(Number(rewardPoints) || 0));
+    if (result?.target) setMsg(`Took back ${Math.abs(result.add)} points from ${result.target.name}.`);
   };
 
   const toggleGroupMember = (playerId) => {
@@ -557,8 +577,8 @@ export default function StudentPage() {
 
   const createGroup = () => {
     const selected = players.filter((p) => groupMemberIds.includes(p.id));
-    if (selected.length !== 5) {
-      setMsg("Select exactly 5 students to create a group.");
+    if (selected.length < 2 || selected.length > 5) {
+      setMsg("Select between 2 and 5 students to create a group.");
       return;
     }
     const cleanName = groupName.trim() || `Group ${teacherGroups.length + 1}`;
@@ -571,7 +591,7 @@ export default function StudentPage() {
     setTeacherGroups((prev) => [...prev, newGroup]);
     setGroupName("");
     setGroupMemberIds([]);
-    setMsg(`Created group "${cleanName}" with 5 students.`);
+    setMsg(`Created group "${cleanName}" with ${selected.length} students.`);
   };
 
   const nextDayColumn = async () => {
@@ -586,12 +606,28 @@ export default function StudentPage() {
     setMsg("");
   };
 
+  const undoDayColumn = async () => {
+    if (!game || !state) return;
+    const prev = Math.max(dayColumn - 1, 0);
+    if (prev === dayColumn) {
+      setMsg("Already at Day 1.");
+      return;
+    }
+    await updateBoardState(game, { day_column: prev });
+    setState((s) => ({ ...(s || {}), day_column: prev }));
+    setMsg("Moved back one day.");
+  };
+
   const whoLine = isTeacher ? "Teacher View" : "Student View";
   const subTitle = (game?.status === "started")
     ? (isTeacher ? "One column per day (left to right). 500-point tiles are take-home for all students." : "Wait for your teacher to send you a challenge.")
     : "Waiting for teacher to start the game…";
   const activeTaskValue = activeTaskKey ? parseTaskKey(activeTaskKey).value : 0;
-  const taskSections = parseTaskSections(activeTaskKey ? getTaskTextByKey(activeTaskKey) : "");
+  const activeTaskParts = activeTaskKey ? parseTaskKey(activeTaskKey) : null;
+  const activeTaskEntry = activeTaskParts
+    ? getTaskEntry(contentData, activeTaskParts.round, activeTaskParts.cat, activeTaskParts.value)
+    : null;
+  const taskSections = parseTaskSections(getTaskTextFromEntry(activeTaskEntry));
 
   return (
     <main className="page" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
@@ -612,7 +648,7 @@ export default function StudentPage() {
             {VALUES.map((v) => cats.map((cat, colIdx) => {
               const k = taskKey(cat, v);
               const isOpened = opened.has(k);
-              const inTodayColumn = colIdx <= dayColumn;
+              const inTodayColumn = colIdx === dayColumn;
               const canStudentOpen = !isTeacher && assignedSet.has(k);
               const isDisabled = isTeacher ? (isOpened || !inTodayColumn) : !canStudentOpen;
               return (
@@ -639,6 +675,7 @@ export default function StudentPage() {
               <div className="mini">Joined: {players.length}</div>
               <div className="mini">Today Column: {dayColumn + 1} / {cats.length} ({cats[dayColumn] || "—"})</div>
               <button className="tbtn tbtnPrimary" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextDayColumn}>Next Day (Next Column)</button>
+              <button className="tbtn tbtnGhost" style={{ width: "100%", marginTop: 8, display: "block" }} onClick={undoDayColumn}>Undo Day (Previous Column)</button>
               <button className="tbtn tbtnWarn" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextRound}>Next Round</button>
               <div style={{ marginTop: 12, padding: 10, borderRadius: 14, background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.08)" }}>
                 <div style={{ fontWeight: 1200 }}>Class Goal</div>
@@ -667,7 +704,7 @@ export default function StudentPage() {
             <div>
               <div className="sideTitle">My Seed</div>
               <div className="mini">Seed in pot: grows as points increase (full at 10,000).</div>
-              <GrowthPotAnimation score={displayStudentScore} />
+              <GrowthPotAnimation score={displayStudentScore} studentKey={studentName} />
               <button
                 className="tbtn tbtnGhost"
                 style={{ width: "100%", marginTop: 8 }}
@@ -730,7 +767,7 @@ export default function StudentPage() {
                 className={`teacherSidebarItem ${teacherSidebarTab === "groups" ? "active" : ""}`}
                 onClick={() => setTeacherSidebarTab("groups")}
               >
-                Groups (5)
+                Groups (2-5)
               </button>
             </div>
             <div className="teacherSidebarContent">
@@ -781,11 +818,14 @@ export default function StudentPage() {
                   <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={rewardStudentFromSidebar} disabled={!players.length}>
                     Award Points
                   </button>
+                  <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={takeBackRewardFromSidebar} disabled={!players.length}>
+                    Take Back Award
+                  </button>
                 </div>
               )}
               {teacherSidebarTab === "groups" && (
                 <div>
-                  <div className="sideTitle">Create Group of 5</div>
+                  <div className="sideTitle">Create Group (2-5)</div>
                   <label className="field" style={{ marginTop: 8 }}>
                     <span>Group Name</span>
                     <input
@@ -795,7 +835,7 @@ export default function StudentPage() {
                       placeholder="e.g., Team Maple"
                     />
                   </label>
-                  <div className="mini" style={{ marginTop: 6 }}>Select exactly 5 students</div>
+                  <div className="mini" style={{ marginTop: 6 }}>Select between 2 and 5 students</div>
                   <div className="list" style={{ maxHeight: 240, marginTop: 8 }}>
                     {players.map((p) => (
                       <label key={p.id} className="pRow" style={{ cursor: "pointer" }}>

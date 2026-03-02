@@ -286,8 +286,8 @@ export default function TeacherPage() {
   };
 
   const createGroup = () => {
-    if (groupMemberIds.length !== 5) {
-      setMsg("Select exactly 5 students to form a group.");
+    if (groupMemberIds.length < 2 || groupMemberIds.length > 5) {
+      setMsg("Select between 2 and 5 students to form a group.");
       return;
     }
     const selected = players.filter((p) => groupMemberIds.includes(p.id));
@@ -304,7 +304,7 @@ export default function TeacherPage() {
     setGroups(next);
     setGroupName("");
     setGroupMemberIds([]);
-    setMsg(`Created ${name}.`);
+    setMsg(`Created ${name} with ${selected.length} students.`);
   };
 
   return (
@@ -396,7 +396,7 @@ export default function TeacherPage() {
           )}
           {sidebarTab === "groups" && (
             <div>
-              <div className="sideTitle">Form Group (5 students)</div>
+              <div className="sideTitle">Form Group (2-5 students)</div>
               <label className="field" style={{ marginTop: 8 }}>
                 <span>Group Name</span>
                 <input
@@ -406,7 +406,7 @@ export default function TeacherPage() {
                   placeholder="e.g., Team Maple"
                 />
               </label>
-              <div className="mini" style={{ marginTop: 6 }}>Select exactly 5 students</div>
+              <div className="mini" style={{ marginTop: 6 }}>Select between 2 and 5 students</div>
               <div className="list" style={{ maxHeight: 220, marginTop: 8 }}>
                 {players.map((p) => (
                   <label key={p.id} className="pRow" style={{ cursor: "pointer" }}>

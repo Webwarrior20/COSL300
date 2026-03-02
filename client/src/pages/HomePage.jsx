@@ -55,6 +55,9 @@ export default function HomePage() {
           <button className="big-btn big-btn-admin" style={{ width: "100%" }} onClick={() => { setMsg(""); setShowModal(true); }}>
             <span className="btn-icon">🧑‍🏫</span> Teacher Login / Signup
           </button>
+          <button className="big-btn big-btn-adminSecondary" style={{ width: "100%" }} onClick={() => { window.location.href = "/admin-login"; }}>
+            <span className="btn-icon">🛡️</span> Admin Login
+          </button>
         </div>
         <div className="pill">✨ After login, you will get a game code to share with students.</div>
       </section>

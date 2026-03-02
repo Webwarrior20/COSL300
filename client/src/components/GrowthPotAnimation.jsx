@@ -1,9 +1,45 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-export default function GrowthPotAnimation({ score = 0 }) {
+function hashText(text) {
+  let hash = 0;
+  const value = String(text || "");
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function getFlowerPalette(seedKey) {
+  const palettes = [
+    { petalA: "#ff8db0", petalB: "#ff7ea8", petalCore: "#f04f87", petalInner: "#d93372", stroke: "#8b2b43", leaf: "#62ca78", pot: "#c9915a", potShade: "#b87f49" },
+    { petalA: "#ffb347", petalB: "#ff9f1c", petalCore: "#ff7b00", petalInner: "#e36414", stroke: "#8a3b12", leaf: "#58bc5e", pot: "#bf8850", potShade: "#ab7441" },
+    { petalA: "#9b8cff", petalB: "#7a6cff", petalCore: "#6254e8", petalInner: "#4f46c8", stroke: "#352f82", leaf: "#5fca7c", pot: "#b78261", potShade: "#9f6a49" },
+    { petalA: "#ff6b6b", petalB: "#ff8787", petalCore: "#ef4444", petalInner: "#dc2626", stroke: "#8b1e1e", leaf: "#64c96b", pot: "#ce8d57", potShade: "#b77845" },
+    { petalA: "#ffd166", petalB: "#ffca3a", petalCore: "#f4b400", petalInner: "#dd9a00", stroke: "#8a6410", leaf: "#72c96c", pot: "#d19962", potShade: "#ba814f" },
+    { petalA: "#6ee7b7", petalB: "#34d399", petalCore: "#10b981", petalInner: "#059669", stroke: "#166534", leaf: "#5fcf88", pot: "#c78756", potShade: "#b17143" }
+  ];
+  return palettes[hashText(seedKey) % palettes.length];
+}
+
+function getPlantVariant(seedKey) {
+  const hash = hashText(seedKey);
+  return {
+    petalCount: 6 + (hash % 3),
+    petalLength: 6.8 + (hash % 4) * 0.7,
+    petalWidth: 3.8 + ((hash >> 2) % 3) * 0.4,
+    bloomScale: 0.92 + ((hash >> 4) % 4) * 0.06,
+    bloomTilt: -10 + ((hash >> 6) % 21),
+    leafTilt: -32 + ((hash >> 8) % 14),
+    leafSize: 1 + ((hash >> 10) % 3) * 0.08
+  };
+}
+
+export default function GrowthPotAnimation({ score = 0, studentKey = "" }) {
   const safeScore = Math.max(0, score || 0);
   const waterCount = Math.floor(safeScore / 200);
   const stage = safeScore < 2000 ? 0 : safeScore < 5000 ? 1 : safeScore < 8000 ? 2 : 3;
+  const flowerPalette = useMemo(() => getFlowerPalette(studentKey), [studentKey]);
+  const plantVariant = useMemo(() => getPlantVariant(studentKey), [studentKey]);
 
   const [showWaterBurst, setShowWaterBurst] = useState(false);
   const [showPitcher, setShowPitcher] = useState(false);
@@ -60,7 +96,8 @@ export default function GrowthPotAnimation({ score = 0 }) {
         <ellipse cx="160" cy="184" rx="68" ry="8" fill="rgba(0,0,0,0.08)" />
         <ellipse cx="160" cy="90" rx="56" ry="12" fill="#d7c1a0" stroke="#6c4a2f" strokeWidth="1.4" />
         <ellipse cx="160" cy="92" rx="49" ry="9" fill="#5f4636" />
-        <path d="M104 91 L216 91 L197 176 L123 176 Z" fill="#c9915a" stroke="#6c4a2f" strokeWidth="1.5" />
+        <path d="M104 91 L216 91 L197 176 L123 176 Z" fill={flowerPalette.pot} stroke="#6c4a2f" strokeWidth="1.5" />
+        <path d="M118 106 L202 106" stroke={flowerPalette.potShade} strokeWidth="2.2" opacity="0.8" />
         <path d="M121 176 L199 176" stroke="#6c4a2f" strokeWidth="1.2" />
 
         {showPitcher && (
@@ -90,34 +127,43 @@ export default function GrowthPotAnimation({ score = 0 }) {
         {stage >= 1 && (
           <g className="plantSway">
             <path d="M160 92 C160 84 160 76 160 66" stroke="#2f6a3e" strokeWidth="4" strokeLinecap="round" fill="none" />
-            <ellipse cx="152" cy="68" rx="10" ry="5" fill="#55b867" transform="rotate(-25 152 68)" />
-            <ellipse cx="168" cy="67" rx="10" ry="5" fill="#55b867" transform="rotate(25 168 67)" />
+            <ellipse cx="152" cy="68" rx={10 * plantVariant.leafSize} ry={5 * plantVariant.leafSize} fill={flowerPalette.leaf} transform={`rotate(${plantVariant.leafTilt} 152 68)`} />
+            <ellipse cx="168" cy="67" rx={10 * plantVariant.leafSize} ry={5 * plantVariant.leafSize} fill={flowerPalette.leaf} transform={`rotate(${Math.abs(plantVariant.leafTilt)} 168 67)`} />
           </g>
         )}
 
         {stage >= 2 && (
           <g className="plantSway">
             <path d="M160 92 C160 82 160 65 160 49" stroke="#2f6a3e" strokeWidth="4" strokeLinecap="round" fill="none" />
-            <ellipse cx="148" cy="62" rx="11" ry="5.5" fill="#5fc572" transform="rotate(-30 148 62)" />
-            <ellipse cx="172" cy="56" rx="11" ry="5.5" fill="#5fc572" transform="rotate(28 172 56)" />
+            <ellipse cx="148" cy="62" rx={11 * plantVariant.leafSize} ry={5.5 * plantVariant.leafSize} fill={flowerPalette.leaf} transform={`rotate(${plantVariant.leafTilt - 2} 148 62)`} />
+            <ellipse cx="172" cy="56" rx={11 * plantVariant.leafSize} ry={5.5 * plantVariant.leafSize} fill={flowerPalette.leaf} transform={`rotate(${Math.abs(plantVariant.leafTilt) - 4} 172 56)`} />
           </g>
         )}
 
         {stage >= 3 && (
           <g className="plantSway">
             <path d="M160 92 C160 78 160 58 160 36" stroke="#2f6a3e" strokeWidth="4" strokeLinecap="round" fill="none" />
-            <ellipse cx="147" cy="55" rx="11" ry="5" fill="#62ca78" transform="rotate(-32 147 55)" />
-            <ellipse cx="173" cy="48" rx="11" ry="5" fill="#62ca78" transform="rotate(30 173 48)" />
-            <g className="flowerBloom">
-              <ellipse cx="160" cy="24" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" />
-              <ellipse cx="169" cy="28" rx="4.3" ry="7.4" fill="#ff7ea8" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(38 169 28)" />
-              <ellipse cx="173" cy="37" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(78 173 37)" />
-              <ellipse cx="166" cy="45" rx="4.3" ry="7.4" fill="#ff7ea8" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(124 166 45)" />
-              <ellipse cx="154" cy="45" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(236 154 45)" />
-              <ellipse cx="147" cy="37" rx="4.3" ry="7.4" fill="#ff7ea8" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(284 147 37)" />
-              <ellipse cx="151" cy="28" rx="4.3" ry="7.4" fill="#ff8db0" stroke="#8b2b43" strokeWidth="0.9" transform="rotate(322 151 28)" />
-              <ellipse cx="160" cy="33" rx="5.4" ry="8.6" fill="#f04f87" stroke="#8b2b43" strokeWidth="1.1" />
-              <ellipse cx="160" cy="35" rx="3.6" ry="5.8" fill="#d93372" stroke="#8b2b43" strokeWidth="1" />
+            <ellipse cx="147" cy="55" rx={11 * plantVariant.leafSize} ry={5 * plantVariant.leafSize} fill={flowerPalette.leaf} transform={`rotate(${plantVariant.leafTilt} 147 55)`} />
+            <ellipse cx="173" cy="48" rx={11 * plantVariant.leafSize} ry={5 * plantVariant.leafSize} fill={flowerPalette.leaf} transform={`rotate(${Math.abs(plantVariant.leafTilt) - 2} 173 48)`} />
+            <g className="flowerBloom" transform={`translate(160 34) rotate(${plantVariant.bloomTilt}) scale(${plantVariant.bloomScale}) translate(-160 -34)`}>
+              {Array.from({ length: plantVariant.petalCount }).map((_, i) => {
+                const angle = (360 / plantVariant.petalCount) * i;
+                return (
+                  <ellipse
+                    key={i}
+                    cx="160"
+                    cy={34 - plantVariant.petalLength}
+                    rx={plantVariant.petalWidth}
+                    ry={plantVariant.petalLength}
+                    fill={i % 2 === 0 ? flowerPalette.petalA : flowerPalette.petalB}
+                    stroke={flowerPalette.stroke}
+                    strokeWidth="0.9"
+                    transform={`rotate(${angle} 160 34)`}
+                  />
+                );
+              })}
+              <ellipse cx="160" cy="33" rx="5.4" ry="8.6" fill={flowerPalette.petalCore} stroke={flowerPalette.stroke} strokeWidth="1.1" />
+              <ellipse cx="160" cy="35" rx="3.6" ry="5.8" fill={flowerPalette.petalInner} stroke={flowerPalette.stroke} strokeWidth="1" />
               <circle cx="160" cy="35" r="1.8" fill="#ffd166" stroke="#8b2b43" strokeWidth="0.8" />
             </g>
           </g>
