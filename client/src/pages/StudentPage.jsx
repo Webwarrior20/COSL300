@@ -462,7 +462,7 @@ export default function StudentPage() {
   }, [players, role, rewardPlayerId]);
 
   useEffect(() => {
-    if (!isTeacher || !game?.id) return;
+    if (!game?.id) return;
     const raw = localStorage.getItem(`${LS_GROUPS_PREFIX}${game.id}`);
     if (!raw) {
       setTeacherGroups([]);
@@ -474,7 +474,7 @@ export default function StudentPage() {
     } catch {
       setTeacherGroups([]);
     }
-  }, [isTeacher, game?.id]);
+  }, [game?.id]);
 
   useEffect(() => {
     if (!isTeacher || !game?.id) return;
@@ -498,6 +498,14 @@ export default function StudentPage() {
   };
 
   const { score, pct, level, studentName } = renderStudentProgress();
+  const studentPlayerId = localStorage.getItem(LS_PLAYER_ID);
+  const studentGroup = !isTeacher
+    ? teacherGroups.find(
+        (group) =>
+          group.memberIds?.includes(studentPlayerId) ||
+          group.memberNames?.some((name) => String(name).trim().toLowerCase() === String(studentName).trim().toLowerCase())
+      ) || null
+    : null;
   const studentTestScores = [0, 2000, 5000, 8000, 10000];
   const displayStudentScore = studentGrowthTestIndex >= 0 ? studentTestScores[studentGrowthTestIndex] : score;
   const displayStudentPct = Math.round((displayStudentScore / 10000) * 100);
@@ -630,7 +638,7 @@ export default function StudentPage() {
   const taskSections = parseTaskSections(getTaskTextFromEntry(activeTaskEntry));
 
   return (
-    <main className="page" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
+    <main className="page gamePage" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}>
       <div className="wrap">
         <section className="boardShell">
           <div className="topLine">
@@ -705,13 +713,6 @@ export default function StudentPage() {
               <div className="sideTitle">My Seed</div>
               <div className="mini">Seed in pot: grows as points increase (full at 10,000).</div>
               <GrowthPotAnimation score={displayStudentScore} studentKey={studentName} />
-              <button
-                className="tbtn tbtnGhost"
-                style={{ width: "100%", marginTop: 8 }}
-                onClick={() => setStudentGrowthTestIndex((prev) => (prev >= studentTestScores.length - 1 ? -1 : prev + 1))}
-              >
-                {studentGrowthTestIndex >= 0 ? "Test Growth (Next Stage)" : "Test Growth"}
-              </button>
               <div className="treeLabel">
                 <div>{displayStudentScore} / 10000</div>
                 <div>{displayStudentLevel}</div>
@@ -720,6 +721,19 @@ export default function StudentPage() {
                 <div className="progressFill" style={{ width: `${displayStudentPct}%` }}></div>
               </div>
               <div className="mini" style={{ marginTop: 10 }}>Student: {studentName}</div>
+              <div style={{ marginTop: 12, padding: 10, borderRadius: 14, background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.08)" }}>
+                <div style={{ fontWeight: 1200 }}>My Group</div>
+                {studentGroup ? (
+                  <>
+                    <div className="mini" style={{ marginTop: 4 }}>{studentGroup.name}</div>
+                    <div className="mini" style={{ marginTop: 6 }}>
+                      {studentGroup.memberNames?.join(", ")}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mini" style={{ marginTop: 4 }}>You are not in a group yet.</div>
+                )}
+              </div>
 
               <div style={{ marginTop: 14, padding: 10, borderRadius: 14, background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.08)" }}>
                 <div style={{ fontWeight: 1200 }}>Class Goal</div>
