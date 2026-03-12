@@ -396,7 +396,7 @@ a{ color:inherit; text-decoration:none; }
 .lobby-start{
   margin-top:16px;
   width:100%;
-  max-width:720px;
+  max-width:none;
 }
 
 .teacherMenuToggle{

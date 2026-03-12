@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.game_content_sets (
   id uuid primary key default gen_random_uuid(),
   title text not null,
+  subject text not null default 'General',
   notes text,
   source_file_path text,
   uploaded_by text,
@@ -10,6 +11,9 @@ create table if not exists public.game_content_sets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.game_content_sets
+  add column if not exists subject text not null default 'General';
 
 create table if not exists public.game_content_items (
   id uuid primary key default gen_random_uuid(),

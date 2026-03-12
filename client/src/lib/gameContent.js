@@ -53,7 +53,7 @@ function buildContentMaps(items) {
 export async function loadPublishedGameContent(sb) {
   const setResult = await sb
     .from("game_content_sets")
-    .select("id,title,notes,published,created_at")
+    .select("id,title,subject,notes,published,created_at")
     .eq("published", true)
     .order("created_at", { ascending: false })
     .limit(1)

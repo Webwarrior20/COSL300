@@ -15,6 +15,9 @@ export default function AdminContentPage() {
   const [userEmail, setUserEmail] = useState("");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [subject, setSubject] = useState("Physical Education & Health and Wellness");
+  const [subjectMode, setSubjectMode] = useState("preset");
+  const [customSubject, setCustomSubject] = useState("");
   const [file, setFile] = useState(null);
   const [msg, setMsg] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -38,7 +41,7 @@ export default function AdminContentPage() {
   const loadImportedSets = async () => {
     const { data, error } = await sb
       .from("game_content_sets")
-      .select("id,title,notes,published,created_at")
+      .select("id,title,subject,notes,published,created_at")
       .order("created_at", { ascending: false })
       .limit(20);
     if (error) {
@@ -81,6 +84,12 @@ export default function AdminContentPage() {
 
     setUploading(true);
     setMsg("Uploading and parsing game content...");
+    const chosenSubject = subjectMode === "custom" ? customSubject.trim() : subject.trim();
+    if (!chosenSubject) {
+      setUploading(false);
+      setMsg("Please choose or enter a subject.");
+      return;
+    }
 
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
     const path = `${Date.now()}-${safeName}`;
@@ -112,6 +121,7 @@ export default function AdminContentPage() {
       .from("game_content_sets")
       .insert([{
         title: title.trim() || file.name,
+        subject: chosenSubject,
         notes: notes.trim() || null,
         source_file_path: path,
         uploaded_by: userEmail || null,
@@ -191,6 +201,39 @@ export default function AdminContentPage() {
         <div className="adminUploadGrid">
           <div className="adminUploadPanel">
             <label className="field">
+              <span>Subject</span>
+              <select
+                className="assignSelect"
+                style={{ minHeight: "unset" }}
+                value={subjectMode === "custom" ? "__custom__" : subject}
+                onChange={(e) => {
+                  if (e.target.value === "__custom__") {
+                    setSubjectMode("custom");
+                  } else {
+                    setSubjectMode("preset");
+                    setSubject(e.target.value);
+                  }
+                }}
+              >
+                <option value="Physical Education & Health and Wellness">Physical Education & Health and Wellness</option>
+                <option value="Science">Science</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Language Arts">Language Arts</option>
+                <option value="Social Studies">Social Studies</option>
+                <option value="__custom__">Other (custom)</option>
+              </select>
+            </label>
+            {subjectMode === "custom" && (
+              <label className="field">
+                <span>Custom Subject</span>
+                <input
+                  value={customSubject}
+                  onChange={(e) => setCustomSubject(e.target.value)}
+                  placeholder="Enter subject name"
+                />
+              </label>
+            )}
+            <label className="field">
               <span>Document Title</span>
               <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., WIN Game Plans - Round Set 1" />
             </label>
@@ -238,6 +281,7 @@ export default function AdminContentPage() {
                 <div key={item.id} className="pRow">
                   <div>
                     <div style={{ fontWeight: 1000 }}>{item.title}</div>
+                    <div className="mini">{item.subject || "General"}</div>
                     <div className="mini">{item.notes || "No notes"}</div>
                   </div>
                   <div className="mini">{item.created_at ? new Date(item.created_at).toLocaleDateString() : ""}</div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sb } from "../supabase";
+import { getRoundConfig, loadPublishedGameContent } from "../lib/gameContent";
 
 const LS_GAME_ID = "ACTIVE_GAME_ID";
 const LS_TEACHER_SECTION = "TEACHER_SECTION";
@@ -20,6 +21,11 @@ export default function TeacherPage() {
   const [groupName, setGroupName] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [startRound, setStartRound] = useState(1);
+  const [roundNames, setRoundNames] = useState({
+    1: "Round 1",
+    2: "Round 2"
+  });
   const pollRef = useRef(null);
   const channelRef = useRef(null);
 
@@ -141,6 +147,13 @@ export default function TeacherPage() {
       const url = await buildJoinUrl();
       setJoinLink(url);
       await ensureLobbyGame(email, section);
+      const content = await loadPublishedGameContent(sb);
+      const r1 = getRoundConfig(content, 1);
+      const r2 = getRoundConfig(content, 2);
+      setRoundNames({
+        1: r1?.title || "Round 1",
+        2: r2?.title || "Round 2"
+      });
       setLoading(false);
     })();
     return () => { alive = false; };
@@ -193,12 +206,17 @@ export default function TeacherPage() {
     localStorage.setItem(`${LS_GROUPS_PREFIX}${game.id}`, JSON.stringify(groups));
   }, [game?.id, groups]);
 
+  useEffect(() => {
+    if (!game?.round) return;
+    setStartRound(game.round);
+  }, [game?.round]);
+
   const startGame = async () => {
     if (!game) return;
     setMsg("Starting game…");
     const { data: updated, error } = await sb
       .from("games")
-      .update({ status: "started" })
+      .update({ status: "started", round: startRound })
       .eq("id", game.id)
       .select("id,status,code")
       .maybeSingle();
@@ -216,11 +234,6 @@ export default function TeacherPage() {
     try { await sb.auth.signOut(); } catch {}
     window.location.href = "/";
   };
-
-  const sorted = [...players].sort((a, b) =>
-    (b.tasks_completed ?? 0) - (a.tasks_completed ?? 0) ||
-    (b.score ?? 0) - (a.score ?? 0)
-  );
 
   const copyJoinLink = async () => {
     if (!joinLink) return;
@@ -461,7 +474,7 @@ export default function TeacherPage() {
         <div className="lobby-code">Game Code: {game?.code || "———"}</div>
         <div className="mini" style={{ marginTop: 6 }}>Section: {game?.section_name || teacherSection || "Not set"}</div>
 
-        <div className="lobby-grid">
+        <div className="lobby-grid" style={{ gridTemplateColumns: "1fr" }}>
           <div className="lobby-box">
             <div style={{ fontWeight: 1200 }}>Students Joined: {players.length}</div>
             <div className="lobby-pillgrid">
@@ -473,15 +486,26 @@ export default function TeacherPage() {
               ))}
             </div>
           </div>
-          <div className="lobby-box">
-            <div style={{ fontWeight: 1200 }}>Live Leaderboard</div>
-            <div className="mini">Sorted by Tasks Completed → Score</div>
-            {sorted.length === 0 && <div className="muted" style={{ marginTop: 8 }}>No data yet.</div>}
-            {sorted.map((p) => (
-              <div key={p.id} className="lobby-row">
-                <div>{p.name}</div><div>⭐ {p.score ?? 0}</div>
-              </div>
-            ))}
+        </div>
+
+        <div className="lobby-box" style={{ marginTop: 12, textAlign: "left" }}>
+          <div style={{ fontWeight: 1200 }}>Choose Starting Round</div>
+          <div className="mini">This is applied when you click START GAME.</div>
+          <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+            <button
+              type="button"
+              className={`btn ${startRound === 1 ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setStartRound(1)}
+            >
+              {roundNames[1]}
+            </button>
+            <button
+              type="button"
+              className={`btn ${startRound === 2 ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setStartRound(2)}
+            >
+              {roundNames[2]}
+            </button>
           </div>
         </div>
 

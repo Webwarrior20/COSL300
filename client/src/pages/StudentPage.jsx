@@ -48,12 +48,17 @@ export default function StudentPage() {
   const [studentGrowthTestIndex, setStudentGrowthTestIndex] = useState(-1);
   const [teacherSidebarOpen, setTeacherSidebarOpen] = useState(false);
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
-  const [rewardPlayerId, setRewardPlayerId] = useState("");
-  const [rewardPoints, setRewardPoints] = useState(100);
+  const [rewardPlayerIds, setRewardPlayerIds] = useState([]);
+  const [rewardPoints, setRewardPoints] = useState(300);
   const [groupName, setGroupName] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState([]);
   const [teacherGroups, setTeacherGroups] = useState([]);
   const [contentData, setContentData] = useState(null);
+  const [studentAnswerText, setStudentAnswerText] = useState("");
+  const [answerBusy, setAnswerBusy] = useState(false);
+  const [teacherAnswers, setTeacherAnswers] = useState([]);
+  const [selectedAnswerIds, setSelectedAnswerIds] = useState([]);
+  const [answerDirty, setAnswerDirty] = useState(false);
 
   const dismissedTaskKeyRef = useRef(null);
   const lastAssignmentIdRef = useRef(null);
@@ -62,7 +67,9 @@ export default function StudentPage() {
   const chGameRef = useRef(null);
   const chPlayersRef = useRef(null);
   const chAssignRef = useRef(null);
+  const chAnswersRef = useRef(null);
   const pollRef = useRef(null);
+  const loadedAnswerTaskRef = useRef("");
 
   const cfg = getRoundConfig(contentData, game?.round || 1);
   const cats = cfg.cats;
@@ -261,6 +268,104 @@ export default function StudentPage() {
     setTaskMsg("Assigned ✅");
   };
 
+  const loadTaskAnswers = async (g) => {
+    if (!g) return [];
+    const { data, error } = await sb
+      .from("task_answers")
+      .select("id,player_id,player_name,task_key,answer_text,updated_at")
+      .eq("game_id", g.id)
+      .order("updated_at", { ascending: false });
+    if (error) {
+      console.log("loadTaskAnswers", error);
+      return [];
+    }
+    return data || [];
+  };
+
+  const loadMyAnswerForTask = async (g, taskK) => {
+    if (!g || !taskK || role !== "student") return;
+    const pid = localStorage.getItem(LS_PLAYER_ID);
+    if (!pid) return;
+    const { data, error } = await sb
+      .from("task_answers")
+      .select("id,answer_text")
+      .eq("game_id", g.id)
+      .eq("player_id", pid)
+      .eq("task_key", taskK)
+      .order("id", { ascending: false })
+      .limit(1);
+    if (error) {
+      console.log("loadMyAnswerForTask", error);
+      return;
+    }
+    if (!answerDirty) {
+      setStudentAnswerText(data?.[0]?.answer_text || "");
+    }
+  };
+
+  const submitStudentAnswer = async () => {
+    if (!game || !activeTaskKey) return;
+    const text = studentAnswerText.trim();
+    if (!text) {
+      setTaskMsg("Please enter an answer first.");
+      return;
+    }
+    const pid = localStorage.getItem(LS_PLAYER_ID);
+    const pname = localStorage.getItem(LS_STUDENT_NAME) || "Student";
+    if (!pid) {
+      setTaskMsg("Missing student identity. Please rejoin.");
+      return;
+    }
+
+    setAnswerBusy(true);
+    try {
+      const { data: existing, error: findErr } = await sb
+        .from("task_answers")
+        .select("id")
+        .eq("game_id", game.id)
+        .eq("player_id", pid)
+        .eq("task_key", activeTaskKey)
+        .order("id", { ascending: false })
+        .limit(1);
+      if (findErr) {
+        console.log("find answer", findErr);
+        setTaskMsg("Could not save answer.");
+        return;
+      }
+      const row = {
+        game_id: game.id,
+        player_id: pid,
+        player_name: pname,
+        task_key: activeTaskKey,
+        answer_text: text,
+        updated_at: new Date().toISOString()
+      };
+      if (existing?.[0]?.id) {
+        const { error: updateErr } = await sb
+          .from("task_answers")
+          .update(row)
+          .eq("id", existing[0].id);
+        if (updateErr) {
+          console.log("update answer", updateErr);
+          setTaskMsg("Could not update answer.");
+          return;
+        }
+      } else {
+        const { error: insertErr } = await sb.from("task_answers").insert([row]);
+        if (insertErr) {
+          console.log("insert answer", insertErr);
+          setTaskMsg("Could not save answer.");
+          return;
+        }
+      }
+      setTaskMsg("Answer saved ✅");
+      setAnswerDirty(false);
+      loadedAnswerTaskRef.current = activeTaskKey;
+    } finally {
+      setAnswerBusy(false);
+    }
+  };
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -292,6 +397,10 @@ export default function StudentPage() {
       const cp = await loadClassProgress(g);
       setClassPoints(cp.class_points ?? 0);
       setClassGoal(cp.goal_points ?? 5000);
+      if (role === "teacher") {
+        const answers = await loadTaskAnswers(g);
+        setTeacherAnswers(answers);
+      }
 
       if (role === "student") {
         const pid = localStorage.getItem(LS_PLAYER_ID);
@@ -373,6 +482,16 @@ export default function StudentPage() {
       }
     }
 
+    if (role === "teacher") {
+      if (chAnswersRef.current) sb.removeChannel(chAnswersRef.current);
+      chAnswersRef.current = sb.channel(`answers-${game.id}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "task_answers", filter: `game_id=eq.${game.id}` }, async () => {
+          const answers = await loadTaskAnswers(game);
+          setTeacherAnswers(answers);
+        })
+        .subscribe();
+    }
+
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
@@ -382,6 +501,10 @@ export default function StudentPage() {
         if (s2) setState(s2);
         const list = await loadPlayers(game);
         setPlayers(list);
+        if (role === "teacher") {
+          const answers = await loadTaskAnswers(game);
+          setTeacherAnswers(answers);
+        }
 
         if (role === "student") {
           if (state?.current_task && dismissedTaskKeyRef.current !== state.current_task) {
@@ -426,8 +549,29 @@ export default function StudentPage() {
       if (chGameRef.current) sb.removeChannel(chGameRef.current);
       if (chPlayersRef.current) sb.removeChannel(chPlayersRef.current);
       if (chAssignRef.current) sb.removeChannel(chAssignRef.current);
+      if (chAnswersRef.current) sb.removeChannel(chAnswersRef.current);
     };
   }, [game, role]);
+
+  useEffect(() => {
+    if (!overlayOpen || isTeacher || !game || !activeTaskKey) return;
+    const parsed = parseTaskKey(activeTaskKey);
+    const value = parsed?.value || 0;
+    if (![100, 200].includes(value)) return;
+    if (loadedAnswerTaskRef.current === activeTaskKey && answerDirty) return;
+    loadedAnswerTaskRef.current = activeTaskKey;
+    setAnswerDirty(false);
+    loadMyAnswerForTask(game, activeTaskKey);
+  }, [overlayOpen, isTeacher, activeTaskKey, game?.id]);
+
+  useEffect(() => {
+    if (!isTeacher || teacherSidebarTab !== "answers" || !game) return;
+    loadTaskAnswers(game).then(setTeacherAnswers);
+  }, [isTeacher, teacherSidebarTab, game?.id]);
+
+  useEffect(() => {
+    setSelectedAnswerIds((prev) => prev.filter((id) => teacherAnswers.some((a) => a.id === id)));
+  }, [teacherAnswers]);
 
   useEffect(() => {
     if (!game) return;
@@ -453,13 +597,11 @@ export default function StudentPage() {
   useEffect(() => {
     if (role !== "teacher") return;
     if (!players.length) {
-      setRewardPlayerId("");
+      setRewardPlayerIds([]);
       return;
     }
-    if (!rewardPlayerId || !players.some((p) => p.id === rewardPlayerId)) {
-      setRewardPlayerId(players[0].id);
-    }
-  }, [players, role, rewardPlayerId]);
+    setRewardPlayerIds((prev) => prev.filter((id) => players.some((p) => p.id === id)));
+  }, [players, role]);
 
   useEffect(() => {
     if (!game?.id) return;
@@ -518,6 +660,10 @@ export default function StudentPage() {
   const displayClassPoints = classPoints;
   const classPct = Math.min(100, Math.round((displayClassPoints / Math.max(1, classGoal)) * 100));
   const classUnlocked = displayClassPoints >= classGoal;
+  const teacherAnswerRows = teacherAnswers.filter((a) => {
+    const value = parseTaskKey(a.task_key)?.value;
+    return value === 100 || value === 200;
+  });
 
   const opened = new Set(state?.opened || []);
   const assignedSet = new Set(assignedKeys);
@@ -537,42 +683,142 @@ export default function StudentPage() {
       day_column: 0,
       updated_at: new Date().toISOString()
     }).eq("game_id", game.id);
-    setMsg("");
+    setGame((g) => (g ? { ...g, round: 2 } : g));
+    setState((s) => ({ ...(s || {}), phase: "board", current_task: null, opened: [], day_column: 0 }));
+    setMsg("Moved to Round 2.");
   };
 
-  const updateStudentScoreFromSidebar = async (delta) => {
-    if (!game || !rewardPlayerId) return;
-    const target = players.find((p) => p.id === rewardPlayerId);
-    if (!target) return;
-    const add = Number(delta) || 0;
-    const nextScore = Math.max(0, (target.score || 0) + add);
-    const nextTasks = add >= 0
-      ? (target.tasks_completed || 0) + 1
-      : Math.max(0, (target.tasks_completed || 0) - 1);
-    const { error } = await sb
-      .from("players")
-      .update({ score: nextScore, tasks_completed: nextTasks })
-      .eq("id", rewardPlayerId)
-      .eq("game_id", game.id);
-    if (error) {
-      setMsg("Could not reward student.");
+  const undoNextRound = async () => {
+    if (!game) return;
+    if ((game.round || 1) <= 1) {
+      setMsg("Already at Round 1.");
       return;
     }
-    setPlayers((prev) => prev.map((p) => (
-      p.id === rewardPlayerId ? { ...p, score: nextScore, tasks_completed: nextTasks } : p
-    )));
-    await upsertStudentTotals(normalizeNameKey(target.name), target.name, nextScore, nextTasks);
-    return { target, add };
+    const prevRound = (game.round || 1) - 1;
+    setMsg(`Switching back to Round ${prevRound}...`);
+    await sb.from("games").update({ round: prevRound }).eq("id", game.id);
+    await sb.from("board_state").update({
+      phase: "board",
+      current_task: null,
+      opened: [],
+      day_column: 0,
+      updated_at: new Date().toISOString()
+    }).eq("game_id", game.id);
+    setGame((g) => (g ? { ...g, round: prevRound } : g));
+    setState((s) => ({ ...(s || {}), phase: "board", current_task: null, opened: [], day_column: 0 }));
+    setMsg(`Moved back to Round ${prevRound}.`);
+  };
+
+  const updateSelectedStudentsScoreFromSidebar = async (delta) => {
+    if (!game) return null;
+    const selectedPlayers = players.filter((p) => rewardPlayerIds.includes(p.id));
+    if (!selectedPlayers.length) {
+      setMsg("Select at least one student.");
+      return null;
+    }
+    const add = Number(delta) || 0;
+    const rows = selectedPlayers.map((p) => ({
+      id: p.id,
+      game_id: game.id,
+      score: Math.max(0, (p.score || 0) + add),
+      tasks_completed: add >= 0
+        ? (p.tasks_completed || 0) + 1
+        : Math.max(0, (p.tasks_completed || 0) - 1)
+    }));
+    const { error } = await sb.from("players").upsert(rows, { onConflict: "id" });
+    if (error) {
+      console.log("updateSelectedStudentsScoreFromSidebar", error);
+      setMsg("Could not update selected students.");
+      return null;
+    }
+    setPlayers((prev) => prev.map((p) => {
+      const next = rows.find((r) => r.id === p.id);
+      return next ? { ...p, score: next.score, tasks_completed: next.tasks_completed } : p;
+    }));
+    await Promise.all(selectedPlayers.map((p) => {
+      const next = rows.find((r) => r.id === p.id);
+      return upsertStudentTotals(normalizeNameKey(p.name), p.name, next?.score || 0, next?.tasks_completed || 0);
+    }));
+    return { count: selectedPlayers.length, add };
   };
 
   const rewardStudentFromSidebar = async () => {
-    const result = await updateStudentScoreFromSidebar(Number(rewardPoints) || 0);
-    if (result?.target) setMsg(`Awarded ${Math.abs(result.add)} points to ${result.target.name}.`);
+    const result = await updateSelectedStudentsScoreFromSidebar(Number(rewardPoints) || 0);
+    if (result) setMsg(`Awarded ${Math.abs(result.add)} points to ${result.count} selected student(s).`);
   };
 
   const takeBackRewardFromSidebar = async () => {
-    const result = await updateStudentScoreFromSidebar(-(Number(rewardPoints) || 0));
-    if (result?.target) setMsg(`Took back ${Math.abs(result.add)} points from ${result.target.name}.`);
+    const result = await updateSelectedStudentsScoreFromSidebar(-(Number(rewardPoints) || 0));
+    if (result) setMsg(`Took back ${Math.abs(result.add)} points from ${result.count} selected student(s).`);
+  };
+
+  const toggleRewardStudent = (playerId) => {
+    setRewardPlayerIds((prev) => (
+      prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
+    ));
+  };
+
+  const toggleSelectedAnswer = (answerId) => {
+    setSelectedAnswerIds((prev) => (
+      prev.includes(answerId) ? prev.filter((id) => id !== answerId) : [...prev, answerId]
+    ));
+  };
+
+  const awardSelectedAnswers = async () => {
+    if (!game) return;
+    const selected = teacherAnswers.filter((a) => selectedAnswerIds.includes(a.id));
+    if (!selected.length) {
+      setMsg("Select at least one answer to reward.");
+      return;
+    }
+    const rewardMap = new Map();
+    selected.forEach((a) => {
+      const parsed = parseTaskKey(a.task_key);
+      const value = parsed?.value;
+      if (![100, 200].includes(value)) return;
+      const playerKey = String(a.player_id);
+      const current = rewardMap.get(playerKey) || { points: 0, taskCount: 0 };
+      rewardMap.set(playerKey, {
+        points: current.points + value,
+        taskCount: current.taskCount + 1
+      });
+    });
+    if (!rewardMap.size) {
+      setMsg("Selected answers are not 100/200 tasks.");
+      return;
+    }
+
+    const rows = players
+      .filter((p) => rewardMap.has(String(p.id)))
+      .map((p) => {
+        const reward = rewardMap.get(String(p.id));
+        return {
+        id: p.id,
+        game_id: game.id,
+        score: Math.max(0, (p.score || 0) + (reward?.points || 0)),
+        tasks_completed: (p.tasks_completed || 0) + (reward?.taskCount || 0)
+      };
+      });
+    if (!rows.length) {
+      setMsg("Could not match selected answers to joined students.");
+      return;
+    }
+    const { error } = await sb.from("players").upsert(rows, { onConflict: "id" });
+    if (error) {
+      console.log("awardSelectedAnswers", error);
+      setMsg("Could not reward selected answers.");
+      return;
+    }
+    setPlayers((prev) => prev.map((p) => {
+      const next = rows.find((r) => r.id === p.id);
+      return next ? { ...p, score: next.score, tasks_completed: next.tasks_completed } : p;
+    }));
+    await Promise.all(rows.map((r) => {
+      const p = players.find((x) => x.id === r.id);
+      return upsertStudentTotals(normalizeNameKey(p?.name || ""), p?.name || "", r.score, r.tasks_completed);
+    }));
+    setSelectedAnswerIds([]);
+    setMsg("Awarded points to students with selected correct answers.");
   };
 
   const toggleGroupMember = (playerId) => {
@@ -681,10 +927,7 @@ export default function StudentPage() {
             <div>
               <div className="sideTitle">Players</div>
               <div className="mini">Joined: {players.length}</div>
-              <div className="mini">Today Column: {dayColumn + 1} / {cats.length} ({cats[dayColumn] || "—"})</div>
-              <button className="tbtn tbtnPrimary" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextDayColumn}>Next Day (Next Column)</button>
-              <button className="tbtn tbtnGhost" style={{ width: "100%", marginTop: 8, display: "block" }} onClick={undoDayColumn}>Undo Day (Previous Column)</button>
-              <button className="tbtn tbtnWarn" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextRound}>Next Round</button>
+              <div className="mini">Round: {game?.round || 1}</div>
               <div style={{ marginTop: 12, padding: 10, borderRadius: 14, background: "rgba(255,255,255,.6)", border: "1px solid rgba(0,0,0,.08)" }}>
                 <div style={{ fontWeight: 1200 }}>Class Goal</div>
                 <div className="mini">Earn {classGoal} points to unlock the class prize</div>
@@ -700,9 +943,7 @@ export default function StudentPage() {
                 {players.length === 0 && <div className="muted">No students yet.</div>}
                 {players.map((p) => (
                   <div key={p.id} className="pRow">
-                    <div>
-                      <div>{p.name}</div>
-                    </div>
+                    <div>{p.name}</div>
                     <div>⭐ {p.score ?? 0}</div>
                   </div>
                 ))}
@@ -764,6 +1005,13 @@ export default function StudentPage() {
             <div className="teacherSidebarNav">
               <button
                 type="button"
+                className={`teacherSidebarItem ${teacherSidebarTab === "game" ? "active" : ""}`}
+                onClick={() => setTeacherSidebarTab("game")}
+              >
+                Game Controls
+              </button>
+              <button
+                type="button"
                 className={`teacherSidebarItem ${teacherSidebarTab === "students" ? "active" : ""}`}
                 onClick={() => setTeacherSidebarTab("students")}
               >
@@ -783,8 +1031,25 @@ export default function StudentPage() {
               >
                 Groups (2-5)
               </button>
+              <button
+                type="button"
+                className={`teacherSidebarItem ${teacherSidebarTab === "answers" ? "active" : ""}`}
+                onClick={() => setTeacherSidebarTab("answers")}
+              >
+                Student Answers
+              </button>
             </div>
             <div className="teacherSidebarContent">
+              {teacherSidebarTab === "game" && (
+                <div>
+                  <div className="sideTitle">Game Controls</div>
+                  <div className="mini">Today Column: {dayColumn + 1} / {cats.length} ({cats[dayColumn] || "—"})</div>
+                  <button className="tbtn tbtnPrimary" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextDayColumn}>Next Day (Next Column)</button>
+                  <button className="tbtn tbtnGhost" style={{ width: "100%", marginTop: 8, display: "block" }} onClick={undoDayColumn}>Undo Day (Previous Column)</button>
+                  <button className="tbtn tbtnWarn" style={{ width: "100%", marginTop: 10, display: "block" }} onClick={nextRound}>Next Round</button>
+                  <button className="tbtn tbtnGhost" style={{ width: "100%", marginTop: 8, display: "block" }} onClick={undoNextRound}>Undo Next Round</button>
+                </div>
+              )}
               {teacherSidebarTab === "students" && (
                 <div>
                   <div className="sideTitle">Student List</div>
@@ -804,17 +1069,20 @@ export default function StudentPage() {
                 <div>
                   <div className="sideTitle">Reward Student</div>
                   <label className="field" style={{ marginTop: 8 }}>
-                    <span>Student</span>
-                    <select
-                      value={rewardPlayerId}
-                      onChange={(e) => setRewardPlayerId(e.target.value)}
-                      className="assignSelect"
-                      style={{ minHeight: "unset", marginTop: 4 }}
-                    >
+                    <span>Select Students (multiple)</span>
+                    <div className="list" style={{ maxHeight: 220, marginTop: 8 }}>
                       {players.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
+                        <label key={p.id} className="pRow" style={{ cursor: "pointer" }}>
+                          <div>{p.name}</div>
+                          <input
+                            type="checkbox"
+                            checked={rewardPlayerIds.includes(p.id)}
+                            onChange={() => toggleRewardStudent(p.id)}
+                          />
+                        </label>
                       ))}
-                    </select>
+                      {players.length === 0 && <div className="mini">No students yet.</div>}
+                    </div>
                   </label>
                   <label className="field">
                     <span>Points</span>
@@ -824,15 +1092,15 @@ export default function StudentPage() {
                       className="assignSelect"
                       style={{ minHeight: "unset", marginTop: 4 }}
                     >
-                      {[100, 200, 300, 400, 500].map((p) => (
+                      {[300, 400, 500].map((p) => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
                   </label>
-                  <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={rewardStudentFromSidebar} disabled={!players.length}>
+                  <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={rewardStudentFromSidebar} disabled={!rewardPlayerIds.length}>
                     Award Points
                   </button>
-                  <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={takeBackRewardFromSidebar} disabled={!players.length}>
+                  <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={takeBackRewardFromSidebar} disabled={!rewardPlayerIds.length}>
                     Take Back Award
                   </button>
                 </div>
@@ -876,6 +1144,37 @@ export default function StudentPage() {
                       </div>
                     ))}
                     {teacherGroups.length === 0 && <div className="mini">No groups created yet.</div>}
+                  </div>
+                </div>
+              )}
+              {teacherSidebarTab === "answers" && (
+                <div>
+                  <div className="sideTitle">Student Answers (100/200)</div>
+                  <div className="mini">Latest submitted answers from students.</div>
+                  <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                    <button className="btn btn-primary" onClick={awardSelectedAnswers} disabled={!selectedAnswerIds.length}>
+                      Reward Selected Correct Answers
+                    </button>
+                  </div>
+                  <div className="list" style={{ maxHeight: 380, marginTop: 10 }}>
+                    {teacherAnswerRows.length === 0 && <div className="mini">No answers submitted yet.</div>}
+                    {teacherAnswerRows.map((a) => {
+                      const parts = parseTaskKey(a.task_key);
+                      const label = parts ? `${parts.cat} ${parts.value}` : a.task_key;
+                      return (
+                        <label key={a.id} className="pRow" style={{ display: "block", cursor: "pointer" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                            <div style={{ fontWeight: 1100 }}>{a.player_name || "Student"} • {label}</div>
+                            <input
+                              type="checkbox"
+                              checked={selectedAnswerIds.includes(a.id)}
+                              onChange={() => toggleSelectedAnswer(a.id)}
+                            />
+                          </div>
+                          <div className="mini" style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>{a.answer_text || "—"}</div>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -943,12 +1242,34 @@ export default function StudentPage() {
             )}
 
             {!isTeacher && (
-              <div className="taskBtns">
-                <button className="tbtn tbtnGhost" onClick={() => {
-                  dismissedTaskKeyRef.current = activeTaskKey;
-                  setOverlayOpen(false);
-                }}>Close</button>
-              </div>
+              <>
+                {[100, 200].includes(activeTaskValue) && (
+                  <div className="taskSectionCard" style={{ marginTop: 10 }}>
+                    <div className="taskSectionTitle">Your Answer</div>
+                    <textarea
+                      className="assignSelect"
+                      style={{ minHeight: 96 }}
+                      value={studentAnswerText}
+                      onChange={(e) => {
+                        setStudentAnswerText(e.target.value);
+                        setAnswerDirty(true);
+                      }}
+                      placeholder="Type your answer here..."
+                    />
+                    <div className="taskBtns" style={{ marginTop: 10 }}>
+                      <button className="tbtn tbtnPrimary" onClick={submitStudentAnswer} disabled={answerBusy}>
+                        {answerBusy ? "Saving..." : "Submit Answer"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="taskBtns">
+                  <button className="tbtn tbtnGhost" onClick={() => {
+                    dismissedTaskKeyRef.current = activeTaskKey;
+                    setOverlayOpen(false);
+                  }}>Close</button>
+                </div>
+              </>
             )}
 
             <div className="muted" style={{ marginTop: 10 }}>{taskMsg}</div>
