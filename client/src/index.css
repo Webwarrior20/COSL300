@@ -152,7 +152,7 @@ a{ color:inherit; text-decoration:none; }
   background: linear-gradient(135deg, #388E3C, #8BC34A);
 }
 .big-btn-adminSecondary{
-  background: linear-gradient(135deg, #23408e, #3b82f6);
+  background: linear-gradient(135deg, #388E3C, #8BC34A);
 }
 .adminLoginCard{
   width:min(680px, 96vw);
