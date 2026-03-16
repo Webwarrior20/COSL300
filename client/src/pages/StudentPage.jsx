@@ -719,16 +719,22 @@ export default function StudentPage() {
     const add = Number(delta) || 0;
     const rows = selectedPlayers.map((p) => ({
       id: p.id,
-      game_id: game.id,
       score: Math.max(0, (p.score || 0) + add),
       tasks_completed: add >= 0
         ? (p.tasks_completed || 0) + 1
         : Math.max(0, (p.tasks_completed || 0) - 1)
     }));
-    const { error } = await sb.from("players").upsert(rows, { onConflict: "id" });
-    if (error) {
-      console.log("updateSelectedStudentsScoreFromSidebar", error);
-      setMsg("Could not update selected students.");
+    const results = await Promise.all(rows.map((r) => (
+      sb.from("players").update({
+        score: r.score,
+        tasks_completed: r.tasks_completed
+      }).eq("id", r.id).eq("game_id", game.id)
+    )));
+    const firstError = results.find((r) => r.error)?.error;
+    if (firstError) {
+      console.log("updateSelectedStudentsScoreFromSidebar", firstError);
+      const details = [firstError.code, firstError.message, firstError.details].filter(Boolean).join(" — ");
+      setMsg(details || "Could not update selected students.");
       return null;
     }
     setPlayers((prev) => prev.map((p) => {
@@ -803,10 +809,17 @@ export default function StudentPage() {
       setMsg("Could not match selected answers to joined students.");
       return;
     }
-    const { error } = await sb.from("players").upsert(rows, { onConflict: "id" });
-    if (error) {
-      console.log("awardSelectedAnswers", error);
-      setMsg("Could not reward selected answers.");
+    const results = await Promise.all(rows.map((r) => (
+      sb.from("players")
+        .update({ score: r.score, tasks_completed: r.tasks_completed })
+        .eq("id", r.id)
+        .eq("game_id", game.id)
+    )));
+    const firstError = results.find((r) => r.error)?.error;
+    if (firstError) {
+      console.log("awardSelectedAnswers", firstError);
+      const details = [firstError.code, firstError.message, firstError.details].filter(Boolean).join(" — ");
+      setMsg(details || "Could not reward selected answers.");
       return;
     }
     setPlayers((prev) => prev.map((p) => {
