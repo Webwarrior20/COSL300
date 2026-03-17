@@ -50,6 +50,8 @@ export default function StudentPage() {
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
   const [rewardPlayerIds, setRewardPlayerIds] = useState([]);
   const [rewardPoints, setRewardPoints] = useState(300);
+  const [groupRewardId, setGroupRewardId] = useState("");
+  const [groupRewardPoints, setGroupRewardPoints] = useState(300);
   const [groupName, setGroupName] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState([]);
   const [teacherGroups, setTeacherGroups] = useState([]);
@@ -748,6 +750,45 @@ export default function StudentPage() {
     return { count: selectedPlayers.length, add };
   };
 
+  const updatePlayersScoreByIds = async (playerIds, delta) => {
+    if (!game) return null;
+    const selectedPlayers = players.filter((p) => playerIds.includes(p.id));
+    if (!selectedPlayers.length) {
+      setMsg("Select a group with students.");
+      return null;
+    }
+    const add = Number(delta) || 0;
+    const rows = selectedPlayers.map((p) => ({
+      id: p.id,
+      score: Math.max(0, (p.score || 0) + add),
+      tasks_completed: add >= 0
+        ? (p.tasks_completed || 0) + 1
+        : Math.max(0, (p.tasks_completed || 0) - 1)
+    }));
+    const results = await Promise.all(rows.map((r) => (
+      sb.from("players").update({
+        score: r.score,
+        tasks_completed: r.tasks_completed
+      }).eq("id", r.id).eq("game_id", game.id)
+    )));
+    const firstError = results.find((r) => r.error)?.error;
+    if (firstError) {
+      console.log("updatePlayersScoreByIds", firstError);
+      const details = [firstError.code, firstError.message, firstError.details].filter(Boolean).join(" — ");
+      setMsg(details || "Could not update selected students.");
+      return null;
+    }
+    setPlayers((prev) => prev.map((p) => {
+      const next = rows.find((r) => r.id === p.id);
+      return next ? { ...p, score: next.score, tasks_completed: next.tasks_completed } : p;
+    }));
+    await Promise.all(selectedPlayers.map((p) => {
+      const next = rows.find((r) => r.id === p.id);
+      return upsertStudentTotals(normalizeNameKey(p.name), p.name, next?.score || 0, next?.tasks_completed || 0);
+    }));
+    return { count: selectedPlayers.length, add };
+  };
+
   const rewardStudentFromSidebar = async () => {
     const result = await updateSelectedStudentsScoreFromSidebar(Number(rewardPoints) || 0);
     if (result) setMsg(`Awarded ${Math.abs(result.add)} points to ${result.count} selected student(s).`);
@@ -756,6 +797,28 @@ export default function StudentPage() {
   const takeBackRewardFromSidebar = async () => {
     const result = await updateSelectedStudentsScoreFromSidebar(-(Number(rewardPoints) || 0));
     if (result) setMsg(`Took back ${Math.abs(result.add)} points from ${result.count} selected student(s).`);
+  };
+
+  const rewardGroupFromSidebar = async () => {
+    if (!groupRewardId) {
+      setMsg("Select a group first.");
+      return;
+    }
+    const group = teacherGroups.find((g) => g.id === groupRewardId);
+    const ids = group?.memberIds || [];
+    const result = await updatePlayersScoreByIds(ids, Number(groupRewardPoints) || 0);
+    if (result) setMsg(`Awarded ${Math.abs(result.add)} points to ${result.count} group member(s).`);
+  };
+
+  const takeBackGroupFromSidebar = async () => {
+    if (!groupRewardId) {
+      setMsg("Select a group first.");
+      return;
+    }
+    const group = teacherGroups.find((g) => g.id === groupRewardId);
+    const ids = group?.memberIds || [];
+    const result = await updatePlayersScoreByIds(ids, -(Number(groupRewardPoints) || 0));
+    if (result) setMsg(`Took back ${Math.abs(result.add)} points from ${result.count} group member(s).`);
   };
 
   const toggleRewardStudent = (playerId) => {
@@ -1158,6 +1221,41 @@ export default function StudentPage() {
                     ))}
                     {teacherGroups.length === 0 && <div className="mini">No groups created yet.</div>}
                   </div>
+
+                  <div className="sideTitle" style={{ marginTop: 14 }}>Reward Group</div>
+                  <label className="field" style={{ marginTop: 8 }}>
+                    <span>Group</span>
+                    <select
+                      value={groupRewardId}
+                      onChange={(e) => setGroupRewardId(e.target.value)}
+                      className="assignSelect"
+                      style={{ minHeight: "unset", marginTop: 4 }}
+                    >
+                      <option value="">Select group</option>
+                      {teacherGroups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Points</span>
+                    <select
+                      value={groupRewardPoints}
+                      onChange={(e) => setGroupRewardPoints(Number(e.target.value))}
+                      className="assignSelect"
+                      style={{ minHeight: "unset", marginTop: 4 }}
+                    >
+                      {[300, 400, 500].map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={rewardGroupFromSidebar} disabled={!teacherGroups.length}>
+                    Award Group Points
+                  </button>
+                  <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={takeBackGroupFromSidebar} disabled={!teacherGroups.length}>
+                    Take Back Group Points
+                  </button>
                 </div>
               )}
               {teacherSidebarTab === "answers" && (

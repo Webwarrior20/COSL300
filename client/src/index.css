@@ -98,6 +98,12 @@ a{ color:inherit; text-decoration:none; }
   border:1px solid rgba(45, 131, 89, 0.08);
 }
 .logo-emoji{ font-size:42px; }
+.logo-image{
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 999px;
+}
 
 .headline{
   margin: 0;
