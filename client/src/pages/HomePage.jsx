@@ -32,17 +32,6 @@ export default function HomePage() {
     window.location.href = "/admin";
   };
 
-  const loginWithGoogle = async () => {
-    if (!sectionName.trim()) return setMsg("Enter section name before Google login.");
-    setMsg("Redirecting to Google...");
-    localStorage.setItem(LS_TEACHER_SECTION, sectionName.trim());
-    const { error } = await sb.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/admin` }
-    });
-    if (error) setMsg(error.message || "Google login failed.");
-  };
-
   const signup = async () => {
     if (!email || !password || !sectionName.trim()) return setMsg("Enter email, password, and section name.");
     setMsg("Signing up...");
@@ -67,9 +56,6 @@ export default function HomePage() {
         <div className="actions">
           <button className="big-btn big-btn-admin" style={{ width: "100%" }} onClick={() => { setMsg(""); setShowModal(true); }}>
             <span className="btn-icon">🧑‍🏫</span> Teacher Login / Signup
-          </button>
-          <button className="big-btn big-btn-adminSecondary" style={{ width: "100%" }} onClick={loginWithGoogle}>
-            <span className="btn-icon">🔵</span> Continue with Google
           </button>
           <button className="big-btn big-btn-adminSecondary" style={{ width: "100%" }} onClick={() => { window.location.href = "/admin-login"; }}>
             <span className="btn-icon">🛡️</span> Admin Login
