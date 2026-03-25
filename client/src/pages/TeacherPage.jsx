@@ -464,8 +464,7 @@ export default function TeacherPage() {
                 <button className="btn btn-ghost" onClick={copyJoinLink}>COPY</button>
                 <a className="btn btn-ghost" href={joinLink} target="_blank" rel="noopener">OPEN</a>
               </div>
-              <div className="mini" style={{ marginTop: 8 }}>Students enter first name + last name + the 6-digit game code.</div>
-            </div>
+                          </div>
           </div>
           <button className="btn btn-ghost" onClick={logout}>LOG OUT</button>
         </div>
@@ -476,7 +475,7 @@ export default function TeacherPage() {
 
         <div className="lobby-grid" style={{ gridTemplateColumns: "1fr" }}>
           <div className="lobby-box">
-            <div style={{ fontWeight: 1200 }}>Students Joined: {players.length}</div>
+            <div style={{ fontWeight: 800 }}>Students Joined: {players.length}</div>
             <div className="lobby-pillgrid">
               {players.length === 0 && <div className="muted" style={{ gridColumn: "1/-1", textAlign: "center" }}>No students joined yet</div>}
               {players.map((p) => (
@@ -489,9 +488,8 @@ export default function TeacherPage() {
         </div>
 
         <div className="lobby-box" style={{ marginTop: 12, textAlign: "left" }}>
-          <div style={{ fontWeight: 1200 }}>Choose Starting Round</div>
-          <div className="mini">This is applied when you click START GAME.</div>
-          <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+          <div style={{ fontWeight: 800 }}>Choose Starting Round</div>
+                <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
             <button
               type="button"
               className={`btn ${startRound === 1 ? "btn-primary" : "btn-ghost"}`}

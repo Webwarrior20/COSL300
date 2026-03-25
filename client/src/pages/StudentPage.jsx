@@ -950,8 +950,6 @@ export default function StudentPage() {
 
   const whoLine = isTeacher ? "Teacher View" : "Student View";
   const subTitle = (game?.status === "started")
-    ? (isTeacher ? "One column per day (left to right). 500-point tiles are take-home for all students." : "Wait for your teacher to send you a challenge.")
-    : "Waiting for teacher to start the game…";
   const activeTaskValue = activeTaskKey ? parseTaskKey(activeTaskKey).value : 0;
   const activeTaskParts = activeTaskKey ? parseTaskKey(activeTaskKey) : null;
   const activeTaskEntry = activeTaskParts
