@@ -10,9 +10,27 @@ export default function HomePage() {
   const LS_TEACHER_SECTION = "TEACHER_SECTION";
 
   useEffect(() => {
-    sb.auth.getSession().then(({ data }) => {
+    let active = true;
+
+    const settleSession = async () => {
+      const { data } = await sb.auth.getSession();
+      if (!active) return;
       if (data?.session?.user) window.location.href = "/admin";
+    };
+
+    settleSession();
+
+    const { data: listener } = sb.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user) {
+        window.location.href = "/admin";
+      }
     });
+
+    return () => {
+      active = false;
+      listener?.subscription?.unsubscribe();
+    };
   }, []);
 
   const login = async () => {
@@ -30,6 +48,27 @@ export default function HomePage() {
     }
     localStorage.setItem(LS_TEACHER_SECTION, sectionName.trim());
     window.location.href = "/admin";
+  };
+
+  const loginWithGoogle = async () => {
+    if (!sectionName.trim()) {
+      setShowModal(true);
+      setMsg("Enter section name before Google login.");
+      return;
+    }
+    setMsg("Redirecting to Google...");
+    localStorage.setItem(LS_TEACHER_SECTION, sectionName.trim());
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "http://10.0.0.130:8080/",
+        queryParams: {
+          access_type: "offline",
+          prompt: "select_account"
+        }
+      }
+    });
+    if (error) setMsg(error.message || "Google login failed.");
   };
 
   const signup = async () => {
@@ -83,6 +122,7 @@ export default function HomePage() {
             <p className="msg">{msg}</p>
             <div className="row" style={{ justifyContent: "center" }}>
               <button className="btn btn-primary" onClick={login}>LOGIN</button>
+              <button className="btn btn-ghost" onClick={loginWithGoogle}>GOOGLE</button>
               <button className="btn btn-ghost" onClick={signup}>SIGN UP</button>
               <button className="btn btn-ghost" onClick={() => setShowModal(false)}>CLOSE</button>
             </div>

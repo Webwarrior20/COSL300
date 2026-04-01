@@ -9,6 +9,8 @@ const LS_GAME_CODE = "GAME_CODE";
 const LS_STUDENT_NAME = "STUDENT_NAME";
 const LS_STUDENT_NAME_KEY = "STUDENT_NAME_KEY";
 const LS_GROUPS_PREFIX = "TEACHER_GROUPS_";
+const DEFAULT_CLASS_GOAL = 50000;
+const GROWTH_THRESHOLDS = [0, 500, 1500, 3000, 10000];
 
 function useQuery() {
   return useMemo(() => new URLSearchParams(window.location.search), []);
@@ -44,7 +46,7 @@ export default function StudentPage() {
   const [modalMode, setModalMode] = useState("select");
   const [assignedKeys, setAssignedKeys] = useState([]);
   const [classPoints, setClassPoints] = useState(0);
-  const [classGoal, setClassGoal] = useState(5000);
+  const [classGoal, setClassGoal] = useState(DEFAULT_CLASS_GOAL);
   const [studentGrowthTestIndex, setStudentGrowthTestIndex] = useState(-1);
   const [teacherSidebarOpen, setTeacherSidebarOpen] = useState(false);
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
@@ -130,17 +132,20 @@ export default function StudentPage() {
       .maybeSingle();
     if (error) {
       console.log("loadClassProgress", error);
-      return { class_points: 0, goal_points: 5000 };
+      return { class_points: 0, goal_points: DEFAULT_CLASS_GOAL };
     }
     if (!data) {
       const insert = await sb.from("class_progress").insert([{
         game_id: g.id,
         class_points: 0,
-        goal_points: 5000
+        goal_points: DEFAULT_CLASS_GOAL
       }]).select("class_points, goal_points").single();
-      return insert.data || { class_points: 0, goal_points: 5000 };
+      return insert.data || { class_points: 0, goal_points: DEFAULT_CLASS_GOAL };
     }
-    return data;
+    return {
+      class_points: data.class_points || 0,
+      goal_points: Math.max(data.goal_points || 0, DEFAULT_CLASS_GOAL)
+    };
   };
 
   const syncClassProgress = async (g, totalPoints) => {
@@ -149,7 +154,7 @@ export default function StudentPage() {
       .upsert([{
         game_id: g.id,
         class_points: totalPoints,
-        goal_points: classGoal || 5000
+        goal_points: Math.max(classGoal || 0, DEFAULT_CLASS_GOAL)
       }], { onConflict: "game_id" });
     if (error) console.log("syncClassProgress", error);
   };
@@ -162,7 +167,7 @@ export default function StudentPage() {
         section_name: g.section_name,
         teacher_email: g.teacher_email || null,
         total_points: totalPoints,
-        goal_points: classGoal || 5000,
+        goal_points: Math.max(classGoal || 0, DEFAULT_CLASS_GOAL),
         updated_at: new Date().toISOString()
       }], { onConflict: "section_name" });
     if (error) console.log("syncSectionTotals", error);
@@ -398,7 +403,7 @@ export default function StudentPage() {
       setPlayers(list);
       const cp = await loadClassProgress(g);
       setClassPoints(cp.class_points ?? 0);
-      setClassGoal(cp.goal_points ?? 5000);
+      setClassGoal(Math.max(cp.goal_points ?? 0, DEFAULT_CLASS_GOAL));
       if (role === "teacher") {
         const answers = await loadTaskAnswers(g);
         setTeacherAnswers(answers);
@@ -633,10 +638,10 @@ export default function StudentPage() {
     const pct = Math.round((score / 10000) * 100);
 
     let level = "Seed";
-    if (score >= 2000) level = "Sprout";
-    if (score >= 5000) level = "Growing Plant";
-    if (score >= 8000) level = "Flowering Plant";
-    if (score >= 10000) level = "Full Bloom";
+    if (score >= GROWTH_THRESHOLDS[1]) level = "Sprout";
+    if (score >= GROWTH_THRESHOLDS[2]) level = "Growing Plant";
+    if (score >= GROWTH_THRESHOLDS[3]) level = "Flowering Plant";
+    if (score >= GROWTH_THRESHOLDS[4]) level = "Full Bloom";
 
     return { score, pct, level, studentName: studentName || me?.name || "—" };
   };
@@ -650,14 +655,14 @@ export default function StudentPage() {
           group.memberNames?.some((name) => String(name).trim().toLowerCase() === String(studentName).trim().toLowerCase())
       ) || null
     : null;
-  const studentTestScores = [0, 2000, 5000, 8000, 10000];
+  const studentTestScores = GROWTH_THRESHOLDS;
   const displayStudentScore = studentGrowthTestIndex >= 0 ? studentTestScores[studentGrowthTestIndex] : score;
   const displayStudentPct = Math.round((displayStudentScore / 10000) * 100);
   const displayStudentLevel =
-    displayStudentScore >= 10000 ? "Full Bloom" :
-    displayStudentScore >= 8000 ? "Flowering Plant" :
-    displayStudentScore >= 5000 ? "Growing Plant" :
-    displayStudentScore >= 2000 ? "Sprout" : "Seed";
+    displayStudentScore >= GROWTH_THRESHOLDS[4] ? "Full Bloom" :
+    displayStudentScore >= GROWTH_THRESHOLDS[3] ? "Flowering Plant" :
+    displayStudentScore >= GROWTH_THRESHOLDS[2] ? "Growing Plant" :
+    displayStudentScore >= GROWTH_THRESHOLDS[1] ? "Sprout" : "Seed";
 
   const displayClassPoints = classPoints;
   const classPct = Math.min(100, Math.round((displayClassPoints / Math.max(1, classGoal)) * 100));
@@ -719,6 +724,10 @@ export default function StudentPage() {
       return null;
     }
     const add = Number(delta) || 0;
+    if ([300, 400].includes(Math.abs(add)) && selectedPlayers.length < 2) {
+      setMsg(`${Math.abs(add)} points are for group activity/collaboration. Select at least 2 students.`);
+      return null;
+    }
     const rows = selectedPlayers.map((p) => ({
       id: p.id,
       score: Math.max(0, (p.score || 0) + add),
@@ -825,6 +834,14 @@ export default function StudentPage() {
     setRewardPlayerIds((prev) => (
       prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
     ));
+  };
+
+  const selectAllRewardStudents = () => {
+    setRewardPlayerIds(players.map((p) => p.id));
+  };
+
+  const clearRewardStudents = () => {
+    setRewardPlayerIds([]);
   };
 
   const toggleSelectedAnswer = (answerId) => {
@@ -965,7 +982,21 @@ export default function StudentPage() {
         <section className="boardShell">
           <div className="topLine">
             <div style={{ fontWeight: 1200 }}>{whoLine}</div>
-            <div>Code: {code || "—"}</div>
+            <div className="topLineActions">
+              {isTeacher && (
+                <button
+                  type="button"
+                  className="tbtn tbtnPrimary boardShortcutBtn"
+                  onClick={() => {
+                    setTeacherSidebarTab("reward");
+                    setTeacherSidebarOpen(true);
+                  }}
+                >
+                  Reward Panel
+                </button>
+              )}
+              <div>Code: {code || "—"}</div>
+            </div>
           </div>
           <div className="topMeta">
             <div>{cfg.title}</div>
@@ -1146,6 +1177,24 @@ export default function StudentPage() {
                   <div className="sideTitle">Reward Student</div>
                   <label className="field" style={{ marginTop: 8 }}>
                     <span>Select Students (multiple)</span>
+                    <div className="row" style={{ justifyContent: "flex-start", gap: 8, marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={selectAllRewardStudents}
+                        disabled={!players.length}
+                      >
+                        Do All
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={clearRewardStudents}
+                        disabled={!rewardPlayerIds.length}
+                      >
+                        Deselect
+                      </button>
+                    </div>
                     <div className="list" style={{ maxHeight: 220, marginTop: 8 }}>
                       {players.map((p) => (
                         <label key={p.id} className="pRow" style={{ cursor: "pointer" }}>
@@ -1168,11 +1217,14 @@ export default function StudentPage() {
                       className="assignSelect"
                       style={{ minHeight: "unset", marginTop: 4 }}
                     >
-                      {[300, 400, 500].map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
+                      <option value={300}>300 (Group Activity)</option>
+                      <option value={400}>400 (Collaboration)</option>
+                      <option value={500}>500</option>
                     </select>
                   </label>
+                  <div className="mini" style={{ marginTop: 6 }}>
+                    Use `300` and `400` for group activities and collaboration rewards.
+                  </div>
                   <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={rewardStudentFromSidebar} disabled={!rewardPlayerIds.length}>
                     Award Points
                   </button>

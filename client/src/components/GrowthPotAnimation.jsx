@@ -37,7 +37,7 @@ function getPlantVariant(seedKey) {
 export default function GrowthPotAnimation({ score = 0, studentKey = "" }) {
   const safeScore = Math.max(0, score || 0);
   const waterCount = Math.floor(safeScore / 200);
-  const stage = safeScore < 2000 ? 0 : safeScore < 5000 ? 1 : safeScore < 8000 ? 2 : 3;
+  const stage = safeScore < 500 ? 0 : safeScore < 1500 ? 1 : safeScore < 3000 ? 2 : 3;
   const flowerPalette = useMemo(() => getFlowerPalette(studentKey), [studentKey]);
   const plantVariant = useMemo(() => getPlantVariant(studentKey), [studentKey]);
 
