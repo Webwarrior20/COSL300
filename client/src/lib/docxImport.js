@@ -38,7 +38,7 @@ function parseCell(lines, fallbackValue) {
     pointValue,
     funFact: fact || "—",
     taskText: task || "—",
-    prizeText: prize || "—"
+    prizeText: prize || ""
   };
 }
 

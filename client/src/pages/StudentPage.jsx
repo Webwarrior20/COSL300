@@ -25,7 +25,7 @@ function parseTaskSections(rawText) {
   return {
     fact: (factMatch?.[1] || "—").trim(),
     task: (taskMatch?.[1] || "—").trim(),
-    prize: (prizeMatch?.[1] || "—").trim()
+    prize: (prizeMatch?.[1] || "").trim()
   };
 }
 
@@ -51,9 +51,9 @@ export default function StudentPage() {
   const [teacherSidebarOpen, setTeacherSidebarOpen] = useState(false);
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
   const [rewardPlayerIds, setRewardPlayerIds] = useState([]);
-  const [rewardPoints, setRewardPoints] = useState(300);
+  const [rewardPoints, setRewardPoints] = useState(100);
   const [groupRewardId, setGroupRewardId] = useState("");
-  const [groupRewardPoints, setGroupRewardPoints] = useState(300);
+  const [groupRewardPoints, setGroupRewardPoints] = useState(100);
   const [groupName, setGroupName] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState([]);
   const [teacherGroups, setTeacherGroups] = useState([]);
@@ -72,6 +72,7 @@ export default function StudentPage() {
   const chPlayersRef = useRef(null);
   const chAssignRef = useRef(null);
   const chAnswersRef = useRef(null);
+  const chContentRef = useRef(null);
   const pollRef = useRef(null);
   const loadedAnswerTaskRef = useRef("");
 
@@ -336,7 +337,8 @@ export default function StudentPage() {
         .limit(1);
       if (findErr) {
         console.log("find answer", findErr);
-        setTaskMsg("Could not save answer.");
+        const details = [findErr.code, findErr.message, findErr.details].filter(Boolean).join(" — ");
+        setTaskMsg(details || "Could not save answer.");
         return;
       }
       const row = {
@@ -354,14 +356,16 @@ export default function StudentPage() {
           .eq("id", existing[0].id);
         if (updateErr) {
           console.log("update answer", updateErr);
-          setTaskMsg("Could not update answer.");
+          const details = [updateErr.code, updateErr.message, updateErr.details].filter(Boolean).join(" — ");
+          setTaskMsg(details || "Could not update answer.");
           return;
         }
       } else {
         const { error: insertErr } = await sb.from("task_answers").insert([row]);
         if (insertErr) {
           console.log("insert answer", insertErr);
-          setTaskMsg("Could not save answer.");
+          const details = [insertErr.code, insertErr.message, insertErr.details].filter(Boolean).join(" — ");
+          setTaskMsg(details || "Could not save answer.");
           return;
         }
       }
@@ -427,6 +431,32 @@ export default function StudentPage() {
     })();
     return () => { alive = false; };
   }, [code, role]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const refreshContent = async () => {
+      const content = await loadPublishedGameContent(sb);
+      if (!alive) return;
+      setContentData(content);
+    };
+
+    refreshContent();
+
+    if (chContentRef.current) sb.removeChannel(chContentRef.current);
+    chContentRef.current = sb.channel(`published-game-content-${role}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_content_sets" }, refreshContent)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_content_items" }, refreshContent)
+      .subscribe();
+
+    return () => {
+      alive = false;
+      if (chContentRef.current) {
+        sb.removeChannel(chContentRef.current);
+        chContentRef.current = null;
+      }
+    };
+  }, [role]);
 
   useEffect(() => {
     if (!game) return;
@@ -844,6 +874,17 @@ export default function StudentPage() {
     setRewardPlayerIds([]);
   };
 
+  const logout = async () => {
+    try {
+      await sb.auth.signOut();
+    } catch {}
+    localStorage.removeItem(LS_GAME_CODE);
+    localStorage.removeItem(LS_PLAYER_ID);
+    localStorage.removeItem(LS_STUDENT_NAME);
+    localStorage.removeItem(LS_STUDENT_NAME_KEY);
+    window.location.href = "/";
+  };
+
   const toggleSelectedAnswer = (answerId) => {
     setSelectedAnswerIds((prev) => (
       prev.includes(answerId) ? prev.filter((id) => id !== answerId) : [...prev, answerId]
@@ -981,18 +1022,9 @@ export default function StudentPage() {
           <div className="topLine">
             <div style={{ fontWeight: 1200 }}>{whoLine}</div>
             <div className="topLineActions">
-              {isTeacher && (
-                <button
-                  type="button"
-                  className="tbtn tbtnPrimary boardShortcutBtn"
-                  onClick={() => {
-                    setTeacherSidebarTab("reward");
-                    setTeacherSidebarOpen(true);
-                  }}
-                >
-                  Reward Panel
-                </button>
-              )}
+              <button type="button" className="tbtn tbtnGhost" onClick={logout}>
+                LOG OUT
+              </button>
               <div>Code: {code || "—"}</div>
             </div>
           </div>
@@ -1215,6 +1247,8 @@ export default function StudentPage() {
                       className="assignSelect"
                       style={{ minHeight: "unset", marginTop: 4 }}
                     >
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
                       <option value={300}>300 (Group Activity)</option>
                       <option value={400}>400 (Collaboration)</option>
                       <option value={500}>500</option>
@@ -1295,7 +1329,7 @@ export default function StudentPage() {
                       className="assignSelect"
                       style={{ minHeight: "unset", marginTop: 4 }}
                     >
-                      {[300, 400, 500].map((p) => (
+                      {[100, 200, 300, 400, 500].map((p) => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
@@ -1371,14 +1405,16 @@ export default function StudentPage() {
               <div className="taskBody">{taskSections.task}</div>
             </div>
 
-            <div className="taskPrizePanel">
-              <div className="taskPrizeIcon">🏆</div>
-              <div>
-                <div className="taskPrizeLabel">Prize</div>
-                <div className="taskPrizeText">{taskSections.prize}</div>
-                <div className="taskPrizePoints">{activeTaskValue || "—"} Points</div>
+            {taskSections.prize && (
+              <div className="taskPrizePanel">
+                <div className="taskPrizeIcon">🏆</div>
+                <div>
+                  <div className="taskPrizeLabel">Prize</div>
+                  <div className="taskPrizeText">{taskSections.prize}</div>
+                  <div className="taskPrizePoints">{activeTaskValue || "—"} Points</div>
+                </div>
               </div>
-            </div>
+            )}
 
             {isTeacher && modalMode === "select" && (
               <>

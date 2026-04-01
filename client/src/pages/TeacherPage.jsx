@@ -28,6 +28,7 @@ export default function TeacherPage() {
   });
   const pollRef = useRef(null);
   const channelRef = useRef(null);
+  const contentChannelRef = useRef(null);
 
   const buildJoinUrl = async () => {
     const host = window.location.hostname;
@@ -157,6 +158,37 @@ export default function TeacherPage() {
       setLoading(false);
     })();
     return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+
+    const refreshContent = async () => {
+      const content = await loadPublishedGameContent(sb);
+      if (!alive) return;
+      const r1 = getRoundConfig(content, 1);
+      const r2 = getRoundConfig(content, 2);
+      setRoundNames({
+        1: r1?.title || "Round 1",
+        2: r2?.title || "Round 2"
+      });
+    };
+
+    refreshContent();
+
+    if (contentChannelRef.current) sb.removeChannel(contentChannelRef.current);
+    contentChannelRef.current = sb.channel("published-game-content")
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_content_sets" }, refreshContent)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_content_items" }, refreshContent)
+      .subscribe();
+
+    return () => {
+      alive = false;
+      if (contentChannelRef.current) {
+        sb.removeChannel(contentChannelRef.current);
+        contentChannelRef.current = null;
+      }
+    };
   }, []);
 
   useEffect(() => {

@@ -43,7 +43,7 @@ function buildContentMaps(items) {
     taskMap[round][category][value] = {
       fact: item.fun_fact || "—",
       task: item.task_text || "—",
-      prize: item.prize_text || "—"
+      prize: item.prize_text || ""
     };
   });
 
@@ -103,6 +103,7 @@ export function getTaskTextFromEntry(entry) {
   if (!entry) return "Task placeholder (replace later).";
   const fact = entry.fact ? `Fun Fact: ${entry.fact}` : "Fun Fact: —";
   const task = entry.task ? `Task: ${entry.task}` : "Task: —";
-  const prize = entry.prize ? `Prize: ${entry.prize}` : "Prize: —";
-  return `${fact}\n\n${task}\n\n${prize}`;
+  const sections = [fact, task];
+  if (entry.prize) sections.push(`Prize: ${entry.prize}`);
+  return sections.join("\n\n");
 }
