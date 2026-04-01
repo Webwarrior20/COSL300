@@ -1014,7 +1014,7 @@ export default function StudentPage() {
                 </div>
               </div>
               <div className="list">
-                {players.length === 0 && <div className="muted">No students yet.</div>}
+                
                 {players.map((p) => (
                   <div key={p.id} className="pRow">
                     <div>{p.name}</div>
@@ -1073,7 +1073,7 @@ export default function StudentPage() {
             type="button"
             onClick={() => setTeacherSidebarOpen((v) => !v)}
           >
-            {teacherSidebarOpen ? "Close Panel" : "Open Panel"}
+            {teacherSidebarOpen ? "Close Panel" : "Reward points & manage game"}
           </button>
           <aside className={`teacherSidebar ${teacherSidebarOpen ? "open" : ""}`}>
             <div className="teacherSidebarNav">
@@ -1259,7 +1259,7 @@ export default function StudentPage() {
               {teacherSidebarTab === "answers" && (
                 <div>
                   <div className="sideTitle">Student Answers (100/200)</div>
-                  <div className="mini">Latest submitted answers from students.</div>
+                
                   <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
                     <button className="btn btn-primary" onClick={awardSelectedAnswers} disabled={!selectedAnswerIds.length}>
                       Reward Selected Correct Answers
@@ -1330,12 +1330,8 @@ export default function StudentPage() {
 
             {isTeacher && modalMode === "select" && (
               <>
-                {activeTaskValue !== 500 && (
-                  <div className="assignHint">100-400: in-school tasks. This task will be shown to all students.</div>
-                )}
-                {activeTaskValue === 500 && (
-                  <div className="assignHint">500-point task: take-home assignment, sent to all students.</div>
-                )}
+                
+              
                 <div className="taskBtns">
                   <button className="tbtn tbtnPrimary" onClick={showToAll}>
                     {activeTaskValue === 500 ? "Assign Take-Home to ALL" : "Show to ALL"}

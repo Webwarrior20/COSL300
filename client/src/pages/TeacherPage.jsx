@@ -327,7 +327,7 @@ export default function TeacherPage() {
         type="button"
         onClick={() => setSidebarOpen((v) => !v)}
       >
-        {sidebarOpen ? "Close Panel" : "Open Panel"}
+        {sidebarOpen ? "Close Panel" : "Reward points & manage game"}
       </button>
 
       <aside className={`teacherSidebar ${sidebarOpen ? "open" : ""}`}>
