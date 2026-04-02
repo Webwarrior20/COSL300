@@ -89,6 +89,39 @@ export default function TeacherPage() {
     return data || null;
   };
 
+  const getLatestGameForTeacherSection = async (email, section) => {
+    let query = sb
+      .from("games")
+      .select("id,code,status,round,created_at,section_name,teacher_email")
+      .eq("teacher_email", email || null)
+      .in("status", ["lobby", "started"])
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (section?.trim()) {
+      query = query.eq("section_name", section.trim());
+    } else {
+      query = query.is("section_name", null);
+    }
+
+    const { data, error } = await query;
+    if (error) return null;
+    const games = Array.isArray(data) ? data : [];
+    const startedGame = games.find((item) => item.status === "started");
+    if (startedGame) return startedGame;
+    return games[0] || null;
+  };
+
+  const ensureBoardState = async (g) => {
+    if (!g?.id) return;
+    await sb.from("board_state").upsert([{
+      game_id: g.id,
+      phase: "board",
+      current_task: null,
+      opened: []
+    }], { onConflict: "game_id" });
+  };
+
   const createNewGame = async (email, section) => {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const { data: g, error } = await sb
@@ -102,12 +135,7 @@ export default function TeacherPage() {
       return null;
     }
 
-    await sb.from("board_state").upsert([{
-      game_id: g.id,
-      phase: "board",
-      current_task: null,
-      opened: []
-    }]);
+    await ensureBoardState(g);
     return g;
   };
 
@@ -117,15 +145,24 @@ export default function TeacherPage() {
     let g = null;
     if (savedId) {
       const existing = await getGameById(savedId);
-      if (existing && existing.status === "lobby") g = existing;
+      if (existing && (existing.status === "lobby" || existing.status === "started")) g = existing;
       else localStorage.removeItem(LS_GAME_ID);
+    }
+    if (!g) {
+      g = await getLatestGameForTeacherSection(email, section);
+    }
+    if (g?.status === "started") {
+      await ensureBoardState(g);
+      window.location.href = `/game?code=${encodeURIComponent(g.code)}&role=teacher`;
+      return;
     }
     if (!g) {
       const fresh = await createNewGame(email, section);
       if (!fresh) return;
       g = fresh;
-      localStorage.setItem(LS_GAME_ID, g.id);
     }
+    await ensureBoardState(g);
+    localStorage.setItem(LS_GAME_ID, g.id);
     setGame(g);
     await refreshLobby(g);
     setMsg("Share the join link + code with students.");

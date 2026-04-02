@@ -63,6 +63,7 @@ export default function StudentPage() {
   const [teacherAnswers, setTeacherAnswers] = useState([]);
   const [selectedAnswerIds, setSelectedAnswerIds] = useState([]);
   const [answerDirty, setAnswerDirty] = useState(false);
+  const [answerValueTab, setAnswerValueTab] = useState(100);
 
   const dismissedTaskKeyRef = useRef(null);
   const lastAssignmentIdRef = useRef(null);
@@ -701,6 +702,7 @@ export default function StudentPage() {
     const value = parseTaskKey(a.task_key)?.value;
     return value === 100 || value === 200;
   });
+  const visibleTeacherAnswerRows = teacherAnswerRows.filter((a) => parseTaskKey(a.task_key)?.value === answerValueTab);
 
   const opened = new Set(state?.opened || []);
   const assignedSet = new Set(assignedKeys);
@@ -1345,15 +1347,28 @@ export default function StudentPage() {
               {teacherSidebarTab === "answers" && (
                 <div>
                   <div className="sideTitle">Student Answers (100/200)</div>
-                
+                  <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
+                    <button
+                      className={`btn ${answerValueTab === 100 ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => setAnswerValueTab(100)}
+                    >
+                      100 Points
+                    </button>
+                    <button
+                      className={`btn ${answerValueTab === 200 ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => setAnswerValueTab(200)}
+                    >
+                      200 Points
+                    </button>
+                  </div>
                   <div className="row" style={{ justifyContent: "flex-start", marginTop: 8 }}>
                     <button className="btn btn-primary" onClick={awardSelectedAnswers} disabled={!selectedAnswerIds.length}>
                       Reward Selected Correct Answers
                     </button>
                   </div>
                   <div className="list" style={{ maxHeight: 380, marginTop: 10 }}>
-                    {teacherAnswerRows.length === 0 && <div className="mini">No answers submitted yet.</div>}
-                    {teacherAnswerRows.map((a) => {
+                    {visibleTeacherAnswerRows.length === 0 && <div className="mini">No answers submitted for {answerValueTab} points yet.</div>}
+                    {visibleTeacherAnswerRows.map((a) => {
                       const parts = parseTaskKey(a.task_key);
                       const label = parts ? `${parts.cat} ${parts.value}` : a.task_key;
                       return (
@@ -1418,12 +1433,11 @@ export default function StudentPage() {
 
             {isTeacher && modalMode === "select" && (
               <>
-                
-              
                 <div className="taskBtns">
                   <button className="tbtn tbtnPrimary" onClick={showToAll}>
                     {activeTaskValue === 500 ? "Assign Take-Home to ALL" : "Show to ALL"}
                   </button>
+                  <button className="tbtn tbtnWarn" onClick={() => closeTask(true)}>Mark as Closed</button>
                 </div>
               </>
             )}
