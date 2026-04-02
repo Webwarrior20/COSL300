@@ -3,8 +3,11 @@ import { sb } from "../supabase";
 
 export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [confirmResetPassword, setConfirmResetPassword] = useState("");
   const [sectionName, setSectionName] = useState("");
   const [msg, setMsg] = useState("");
   const LS_TEACHER_SECTION = "TEACHER_SECTION";
@@ -22,6 +25,12 @@ export default function HomePage() {
 
     const { data: listener } = sb.auth.onAuthStateChange((event, session) => {
       if (!active) return;
+      if (event === "PASSWORD_RECOVERY") {
+        setRecoveryMode(true);
+        setShowModal(true);
+        setMsg("Enter your new password.");
+        return;
+      }
       if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session?.user) {
         window.location.href = "/admin";
       }
@@ -58,10 +67,11 @@ export default function HomePage() {
     }
     setMsg("Redirecting to Google...");
     localStorage.setItem(LS_TEACHER_SECTION, sectionName.trim());
+    const redirectTo = `${window.location.origin}/`;
     const { error } = await sb.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://10.0.0.130:8080/",
+        redirectTo,
         queryParams: {
           access_type: "offline",
           prompt: "select_account"
@@ -80,6 +90,48 @@ export default function HomePage() {
     setMsg("Account created ✅ Now LOGIN (or confirm email if required).");
   };
 
+  const sendPasswordReset = async () => {
+    if (!email) {
+      setMsg("Enter your email first.");
+      return;
+    }
+    setMsg("Sending reset email...");
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/`
+    });
+    if (error) {
+      setMsg(error.message || "Could not send reset email.");
+      return;
+    }
+    setMsg("Password reset email sent. Open the link in your inbox to set a new password.");
+  };
+
+  const updatePassword = async () => {
+    if (!resetPassword || !confirmResetPassword) {
+      setMsg("Enter and confirm your new password.");
+      return;
+    }
+    if (resetPassword !== confirmResetPassword) {
+      setMsg("Passwords do not match.");
+      return;
+    }
+    if (resetPassword.length < 6) {
+      setMsg("Password must be at least 6 characters.");
+      return;
+    }
+    setMsg("Updating password...");
+    const { error } = await sb.auth.updateUser({ password: resetPassword });
+    if (error) {
+      setMsg(error.message || "Could not update password.");
+      return;
+    }
+    setRecoveryMode(false);
+    setResetPassword("");
+    setConfirmResetPassword("");
+    setPassword("");
+    setMsg("Password updated ✅ You can login now.");
+  };
+
   return (
     <main className="page">
       <section className="card" style={{ textAlign: "center" }}>
@@ -93,7 +145,7 @@ export default function HomePage() {
           Teacher hosts the game. Students join with a <b>code</b> and complete challenges to win squares.
         </p>
         <div className="actions">
-          <button className="big-btn big-btn-admin" style={{ width: "100%" }} onClick={() => { setMsg(""); setShowModal(true); }}>
+          <button className="big-btn big-btn-admin" style={{ width: "100%" }} onClick={() => { setMsg(""); setRecoveryMode(false); setShowModal(true); }}>
             <span className="btn-icon">🧑‍🏫</span> Teacher Login / Signup
           </button>
           <button className="big-btn big-btn-adminSecondary" style={{ width: "100%" }} onClick={() => { window.location.href = "/admin-login"; }}>
@@ -106,25 +158,67 @@ export default function HomePage() {
       {showModal && (
         <div className="modal">
           <div className="modal-card">
-            <h2>Teacher Login</h2>
+            <h2>{recoveryMode ? "Reset Password" : "Teacher Login"}</h2>
             <label className="field">
               <span>Email</span>
               <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="name@email.com" autoComplete="email" />
             </label>
-            <label className="field">
-              <span>Section Name</span>
-              <input value={sectionName} onChange={(e) => setSectionName(e.target.value)} type="text" placeholder="e.g., Grade 4A" />
-            </label>
-            <label className="field">
-              <span>Password</span>
-              <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" autoComplete="current-password" />
-            </label>
+            {!recoveryMode && (
+              <>
+                <label className="field">
+                  <span>Section Name</span>
+                  <input value={sectionName} onChange={(e) => setSectionName(e.target.value)} type="text" placeholder="e.g., Grade 4A" />
+                </label>
+                <label className="field">
+                  <span>Password</span>
+                  <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" autoComplete="current-password" />
+                </label>
+              </>
+            )}
+            {recoveryMode && (
+              <>
+                <label className="field">
+                  <span>New Password</span>
+                  <input
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    type="password"
+                    placeholder="Enter new password"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="field">
+                  <span>Confirm New Password</span>
+                  <input
+                    value={confirmResetPassword}
+                    onChange={(e) => setConfirmResetPassword(e.target.value)}
+                    type="password"
+                    placeholder="Confirm new password"
+                    autoComplete="new-password"
+                  />
+                </label>
+              </>
+            )}
             <p className="msg">{msg}</p>
+            {!recoveryMode && (
+              <div className="row" style={{ justifyContent: "flex-start", marginTop: 0 }}>
+                <button className="btn btn-ghost" onClick={sendPasswordReset}>FORGOT PASSWORD?</button>
+              </div>
+            )}
             <div className="row" style={{ justifyContent: "center" }}>
-              <button className="btn btn-primary" onClick={login}>LOGIN</button>
-              <button className="btn btn-ghost" onClick={loginWithGoogle}>GOOGLE</button>
-              <button className="btn btn-ghost" onClick={signup}>SIGN UP</button>
-              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>CLOSE</button>
+              {recoveryMode ? (
+                <>
+                  <button className="btn btn-primary" onClick={updatePassword}>UPDATE PASSWORD</button>
+                  <button className="btn btn-ghost" onClick={() => { setRecoveryMode(false); setResetPassword(""); setConfirmResetPassword(""); setMsg(""); }}>BACK TO LOGIN</button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-primary" onClick={login}>LOGIN</button>
+                  <button className="btn btn-ghost" onClick={loginWithGoogle}>GOOGLE</button>
+                  <button className="btn btn-ghost" onClick={signup}>SIGN UP</button>
+                </>
+              )}
+              <button className="btn btn-ghost" onClick={() => { setShowModal(false); setRecoveryMode(false); setMsg(""); }}>CLOSE</button>
             </div>
           </div>
         </div>
