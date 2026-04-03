@@ -218,8 +218,21 @@ export default function StudentPage() {
     } else {
       opened = opened.filter((k) => k !== key);
     }
-    await updateBoardState(game, { current_task: null, opened, phase: "board" });
-    setState((s) => ({ ...(s || {}), current_task: null, opened, phase: "board" }));
+
+    let nextDayColumn = dayColumn;
+    if (markUsed && cats[dayColumn]) {
+      const currentColumnKeys = VALUES.map((value) => taskKey(cats[dayColumn], value));
+      const columnFinished = currentColumnKeys.every((columnKey) => opened.includes(columnKey));
+      if (columnFinished && dayColumn < cats.length - 1) {
+        nextDayColumn = dayColumn + 1;
+        setMsg(`Moved to ${cats[nextDayColumn]}.`);
+      } else if (columnFinished) {
+        setMsg("All columns in this round are complete.");
+      }
+    }
+
+    await updateBoardState(game, { current_task: null, opened, phase: "board", day_column: nextDayColumn });
+    setState((s) => ({ ...(s || {}), current_task: null, opened, phase: "board", day_column: nextDayColumn }));
     setOverlayOpen(false);
   };
 

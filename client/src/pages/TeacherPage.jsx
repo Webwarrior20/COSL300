@@ -295,7 +295,7 @@ export default function TeacherPage() {
       setMsg("❌ Could not start game (permissions/RLS).");
       return;
     }
-    localStorage.removeItem(LS_GAME_ID);
+    localStorage.setItem(LS_GAME_ID, game.id);
     window.location.href = `/game?code=${encodeURIComponent(game.code)}&role=teacher`;
   };
 
