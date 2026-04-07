@@ -109,7 +109,7 @@ function makeChain(table) {
       return {
         data: {
           class_points: 0,
-          goal_points: 50000
+          goal_points: 25000
         },
         error: null
       };
@@ -171,7 +171,7 @@ describe("StudentPage", () => {
     vi.stubGlobal("clearInterval", vi.fn());
   });
 
-  it("shows the reward panel controls with 100/200 manual points, do all, deselect, and 50000 class goal", async () => {
+  it("shows the reward panel controls with 100/200/300/400/500, do all, deselect, and 25000 class goal", async () => {
     render(<StudentPage />);
 
     await screen.findByText("Reward points & manage game");
@@ -181,11 +181,12 @@ describe("StudentPage", () => {
 
     expect(screen.getByText("Do All")).toBeInTheDocument();
     expect(screen.getByText("Deselect")).toBeInTheDocument();
-    expect(screen.getByText(/Earn 50000 points to unlock the class prize/i)).toBeInTheDocument();
+    expect(screen.getByText(/Earn 25000 points to unlock the class prize/i)).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "100" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "200" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "300 (Group Activity)" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "400 (Collaboration)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "500" })).toBeInTheDocument();
   });
 
   it("submits a student answer for a 100-point task", async () => {

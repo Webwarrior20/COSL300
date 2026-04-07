@@ -9,8 +9,8 @@ const LS_GAME_CODE = "GAME_CODE";
 const LS_STUDENT_NAME = "STUDENT_NAME";
 const LS_STUDENT_NAME_KEY = "STUDENT_NAME_KEY";
 const LS_GROUPS_PREFIX = "TEACHER_GROUPS_";
-const DEFAULT_CLASS_GOAL = 50000;
-const GROWTH_THRESHOLDS = [0, 500, 1500, 3000, 10000];
+const DEFAULT_CLASS_GOAL = 25000;
+const GROWTH_THRESHOLDS = [0, 200, 1500, 3000, 10000];
 
 function useQuery() {
   return useMemo(() => new URLSearchParams(window.location.search), []);
@@ -51,7 +51,7 @@ export default function StudentPage() {
   const [teacherSidebarOpen, setTeacherSidebarOpen] = useState(false);
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
   const [rewardPlayerIds, setRewardPlayerIds] = useState([]);
-  const [rewardPoints, setRewardPoints] = useState(100);
+  const [rewardPoints, setRewardPoints] = useState(300);
   const [groupRewardId, setGroupRewardId] = useState("");
   const [groupRewardPoints, setGroupRewardPoints] = useState(100);
   const [groupName, setGroupName] = useState("");
@@ -146,7 +146,7 @@ export default function StudentPage() {
     }
     return {
       class_points: data.class_points || 0,
-      goal_points: Math.max(data.goal_points || 0, DEFAULT_CLASS_GOAL)
+      goal_points: data.goal_points || DEFAULT_CLASS_GOAL
     };
   };
 
@@ -156,7 +156,7 @@ export default function StudentPage() {
       .upsert([{
         game_id: g.id,
         class_points: totalPoints,
-        goal_points: Math.max(classGoal || 0, DEFAULT_CLASS_GOAL)
+        goal_points: classGoal || DEFAULT_CLASS_GOAL
       }], { onConflict: "game_id" });
     if (error) console.log("syncClassProgress", error);
   };
@@ -169,7 +169,7 @@ export default function StudentPage() {
         section_name: g.section_name,
         teacher_email: g.teacher_email || null,
         total_points: totalPoints,
-        goal_points: Math.max(classGoal || 0, DEFAULT_CLASS_GOAL),
+        goal_points: classGoal || DEFAULT_CLASS_GOAL,
         updated_at: new Date().toISOString()
       }], { onConflict: "section_name" });
     if (error) console.log("syncSectionTotals", error);
@@ -421,7 +421,7 @@ export default function StudentPage() {
       setPlayers(list);
       const cp = await loadClassProgress(g);
       setClassPoints(cp.class_points ?? 0);
-      setClassGoal(Math.max(cp.goal_points ?? 0, DEFAULT_CLASS_GOAL));
+      setClassGoal(cp.goal_points ?? DEFAULT_CLASS_GOAL);
       if (role === "teacher") {
         const answers = await loadTaskAnswers(g);
         setTeacherAnswers(answers);
