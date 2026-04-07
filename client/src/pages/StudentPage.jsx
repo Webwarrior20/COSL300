@@ -47,7 +47,6 @@ export default function StudentPage() {
   const [assignedKeys, setAssignedKeys] = useState([]);
   const [classPoints, setClassPoints] = useState(0);
   const [classGoal, setClassGoal] = useState(DEFAULT_CLASS_GOAL);
-  const [studentGrowthTestIndex, setStudentGrowthTestIndex] = useState(-1);
   const [teacherSidebarOpen, setTeacherSidebarOpen] = useState(false);
   const [teacherSidebarTab, setTeacherSidebarTab] = useState("students");
   const [rewardPlayerIds, setRewardPlayerIds] = useState([]);
@@ -699,8 +698,7 @@ export default function StudentPage() {
           group.memberNames?.some((name) => String(name).trim().toLowerCase() === String(studentName).trim().toLowerCase())
       ) || null
     : null;
-  const studentTestScores = GROWTH_THRESHOLDS;
-  const displayStudentScore = studentGrowthTestIndex >= 0 ? studentTestScores[studentGrowthTestIndex] : score;
+  const displayStudentScore = score;
   const displayStudentPct = Math.round((displayStudentScore / 10000) * 100);
   const displayStudentLevel =
     displayStudentScore >= GROWTH_THRESHOLDS[4] ? "Full Bloom" :
@@ -1037,9 +1035,11 @@ export default function StudentPage() {
           <div className="topLine">
             <div style={{ fontWeight: 1200 }}>{whoLine}</div>
             <div className="topLineActions">
-              <button type="button" className="tbtn tbtnGhost" onClick={logout}>
-                LOG OUT
-              </button>
+              {isTeacher && (
+                <button type="button" className="tbtn tbtnGhost" onClick={logout}>
+                  LOG OUT
+                </button>
+              )}
               <div>Code: {code || "—"}</div>
             </div>
           </div>
@@ -1264,8 +1264,8 @@ export default function StudentPage() {
                     >
                       <option value={100}>100</option>
                       <option value={200}>200</option>
-                      <option value={300}>300 (Group Activity)</option>
-                      <option value={400}>400 (Collaboration)</option>
+                      <option value={300}>300</option>
+                      <option value={400}>400</option>
                       <option value={500}>500</option>
                     </select>
                   </label>
