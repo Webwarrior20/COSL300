@@ -151,11 +151,6 @@ export default function TeacherPage() {
     if (!g) {
       g = await getLatestGameForTeacherSection(email, section);
     }
-    if (g?.status === "started") {
-      await ensureBoardState(g);
-      window.location.href = `/game?code=${encodeURIComponent(g.code)}&role=teacher`;
-      return;
-    }
     if (!g) {
       const fresh = await createNewGame(email, section);
       if (!fresh) return;
@@ -165,6 +160,10 @@ export default function TeacherPage() {
     localStorage.setItem(LS_GAME_ID, g.id);
     setGame(g);
     await refreshLobby(g);
+    if (g.status === "started") {
+      setMsg("This class already has a game in progress. You can review the lobby or resume when ready.");
+      return;
+    }
     setMsg("Share the join link + code with students.");
   };
 
@@ -282,6 +281,11 @@ export default function TeacherPage() {
 
   const startGame = async () => {
     if (!game) return;
+    if (game.status === "started") {
+      localStorage.setItem(LS_GAME_ID, game.id);
+      window.location.href = `/game?code=${encodeURIComponent(game.code)}&role=teacher`;
+      return;
+    }
     setMsg("Starting game…");
     const { data: updated, error } = await sb
       .from("games")
@@ -541,6 +545,11 @@ export default function TeacherPage() {
         <div className="lobby-title">Win Squares Lobby</div>
         <div className="lobby-code">Game Code: {game?.code || "———"}</div>
         <div className="mini" style={{ marginTop: 6 }}>Section: {game?.section_name || teacherSection || "Not set"}</div>
+        {game?.status === "started" && (
+          <div className="mini" style={{ marginTop: 6, fontWeight: 800 }}>
+            Game status: In progress
+          </div>
+        )}
 
         <div className="lobby-grid" style={{ gridTemplateColumns: "1fr" }}>
           <div className="lobby-box">
@@ -563,6 +572,7 @@ export default function TeacherPage() {
               type="button"
               className={`btn ${startRound === 1 ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setStartRound(1)}
+              disabled={game?.status === "started"}
             >
               {roundNames[1]}
             </button>
@@ -570,13 +580,16 @@ export default function TeacherPage() {
               type="button"
               className={`btn ${startRound === 2 ? "btn-primary" : "btn-ghost"}`}
               onClick={() => setStartRound(2)}
+              disabled={game?.status === "started"}
             >
               {roundNames[2]}
             </button>
           </div>
         </div>
 
-        <button className="big-btn big-btn-admin lobby-start" disabled={!game || loading} onClick={startGame}>START GAME</button>
+        <button className="big-btn big-btn-admin lobby-start" disabled={!game || loading} onClick={startGame}>
+          {game?.status === "started" ? "RESUME GAME" : "START GAME"}
+        </button>
         <p className="muted" style={{ marginTop: 12 }}>{msg}</p>
       </section>
     </main>
