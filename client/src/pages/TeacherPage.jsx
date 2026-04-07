@@ -112,21 +112,44 @@ export default function TeacherPage() {
     return games[0] || null;
   };
 
-  const ensureBoardState = async (g) => {
+  const getBoardStateByGameId = async (gameId) => {
+    if (!gameId) return null;
+    const { data, error } = await sb
+      .from("board_state")
+      .select("*")
+      .eq("game_id", gameId)
+      .maybeSingle();
+    if (error) return null;
+    return data || null;
+  };
+
+  const ensureBoardState = async (g, seed = {}) => {
     if (!g?.id) return;
+    const existing = await getBoardStateByGameId(g.id);
     await sb.from("board_state").upsert([{
       game_id: g.id,
-      phase: "board",
+      phase: existing?.phase || seed.phase || "board",
       current_task: null,
-      opened: []
+      opened: Array.isArray(existing?.opened)
+        ? existing.opened
+        : (Array.isArray(seed.opened) ? seed.opened : []),
+      day_column: typeof existing?.day_column === "number"
+        ? existing.day_column
+        : (typeof seed.day_column === "number" ? seed.day_column : 0)
     }], { onConflict: "game_id" });
   };
 
-  const createNewGame = async (email, section) => {
+  const createNewGame = async (email, section, seed = {}) => {
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const { data: g, error } = await sb
       .from("games")
-      .insert([{ code, status: "lobby", round: 1, section_name: section || null, teacher_email: email || null }])
+      .insert([{
+        code,
+        status: "lobby",
+        round: seed.round || 1,
+        section_name: section || null,
+        teacher_email: email || null
+      }])
       .select("id,code,status,round,section_name,teacher_email")
       .single();
     if (error || !g) {
@@ -135,7 +158,7 @@ export default function TeacherPage() {
       return null;
     }
 
-    await ensureBoardState(g);
+    await ensureBoardState(g, seed.boardState);
     return g;
   };
 
@@ -145,11 +168,44 @@ export default function TeacherPage() {
     let g = null;
     if (savedId) {
       const existing = await getGameById(savedId);
-      if (existing && (existing.status === "lobby" || existing.status === "started")) g = existing;
+      if (existing?.status === "lobby") g = existing;
       else localStorage.removeItem(LS_GAME_ID);
     }
     if (!g) {
-      g = await getLatestGameForTeacherSection(email, section);
+      let query = sb
+        .from("games")
+        .select("id,code,status,round,created_at,section_name,teacher_email")
+        .eq("teacher_email", email || null)
+        .in("status", ["lobby", "started"])
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (section?.trim()) {
+        query = query.eq("section_name", section.trim());
+      } else {
+        query = query.is("section_name", null);
+      }
+
+      const { data, error } = await query;
+      const games = error || !Array.isArray(data) ? [] : data;
+      const lobbyGame = games.find((item) => item.status === "lobby");
+      const startedGame = games.find((item) => item.status === "started");
+
+      if (lobbyGame) {
+        g = lobbyGame;
+      } else if (startedGame) {
+        const previousState = await getBoardStateByGameId(startedGame.id);
+        g = await createNewGame(email, section, {
+          round: startedGame.round || 1,
+          boardState: {
+            phase: previousState?.phase || "board",
+            opened: previousState?.opened || [],
+            day_column: typeof previousState?.day_column === "number" ? previousState.day_column : 0
+          }
+        });
+        if (!g) return;
+        setMsg("Started a fresh lobby with your saved class progress.");
+      }
     }
     if (!g) {
       const fresh = await createNewGame(email, section);
@@ -160,11 +216,7 @@ export default function TeacherPage() {
     localStorage.setItem(LS_GAME_ID, g.id);
     setGame(g);
     await refreshLobby(g);
-    if (g.status === "started") {
-      setMsg("This class already has a game in progress. You can review the lobby or resume when ready.");
-      return;
-    }
-    setMsg("Share the join link + code with students.");
+    setMsg((current) => current || "Share the join link + code with students.");
   };
 
   useEffect(() => {
