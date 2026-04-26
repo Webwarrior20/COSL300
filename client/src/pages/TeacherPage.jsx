@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sb } from "../supabase";
 import { getRoundConfig, loadPublishedGameContent } from "../lib/gameContent";
-import QRCode from "qrcode";
 
 const LS_GAME_ID = "ACTIVE_GAME_ID";
 const LS_TEACHER_SECTION = "TEACHER_SECTION";
@@ -14,8 +13,6 @@ export default function TeacherPage() {
   const [game, setGame] = useState(null);
   const [players, setPlayers] = useState([]);
   const [joinLink, setJoinLink] = useState("");
-  const [joinQrUrl, setJoinQrUrl] = useState("");
-  const [showJoinQr, setShowJoinQr] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState("students");
@@ -157,7 +154,7 @@ export default function TeacherPage() {
       .single();
     if (error || !g) {
       console.log("CREATE GAME ERROR:", error);
-      setMsg("Could not create game. Check Supabase tables/RLS.");
+      setMsg(`Could not create game. ${error?.code ? `${error.code}: ` : ""}${error?.message || "Check Supabase tables/RLS."}`);
       return null;
     }
 
@@ -250,35 +247,6 @@ export default function TeacherPage() {
     })();
     return () => { alive = false; };
   }, []);
-
-  useEffect(() => {
-    let alive = true;
-
-    const buildQr = async () => {
-      if (!joinLink || !showJoinQr) {
-        setJoinQrUrl("");
-        return;
-      }
-      try {
-        const url = await QRCode.toDataURL(joinLink, {
-          width: 220,
-          margin: 1,
-          color: {
-            dark: "#1e5f2b",
-            light: "#0000"
-          }
-        });
-        if (alive) setJoinQrUrl(url);
-      } catch {
-        if (alive) setJoinQrUrl("");
-      }
-    };
-
-    buildQr();
-    return () => {
-      alive = false;
-    };
-  }, [joinLink, showJoinQr]);
 
   useEffect(() => {
     let alive = true;
@@ -621,27 +589,6 @@ export default function TeacherPage() {
                 <button className="btn btn-ghost" onClick={copyJoinLink}>COPY</button>
                 <a className="btn btn-ghost" href={joinLink} target="_blank" rel="noopener">OPEN</a>
               </div>
-              <div className="row" style={{ justifyContent: "center", marginTop: 12 }}>
-                <button
-                  className="btn btn-ghost"
-                  type="button"
-                  onClick={() => setShowJoinQr((prev) => !prev)}
-                >
-                  {showJoinQr ? "HIDE QR CODE" : "GENERATE QR CODE"}
-                </button>
-              </div>
-              {showJoinQr && joinQrUrl && (
-                <div style={{ marginTop: 18, display: "flex", justifyContent: "center" }}>
-                  <div style={{ padding: 14, borderRadius: 20, background: "rgba(255,255,255,.86)", border: "1px solid rgba(0,0,0,.08)", textAlign: "center" }}>
-                    <img
-                      src={joinQrUrl}
-                      alt="QR code for joining the game"
-                      style={{ width: 180, height: 180, display: "block" }}
-                    />
-                    <div className="mini" style={{ marginTop: 8 }}>Scan to join</div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
           <button className="btn btn-ghost" onClick={logout}>LOG OUT</button>

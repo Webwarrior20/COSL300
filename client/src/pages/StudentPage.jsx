@@ -249,7 +249,7 @@ export default function StudentPage() {
     const { error } = await sb.from("task_assignments").insert(rows);
     if (error) {
       console.log(error);
-      setTaskMsg("Show failed (check table/RLS).");
+      setTaskMsg(`Show failed. ${error.code ? `${error.code}: ` : ""}${error.message || "Check table/RLS."}`);
       return;
     }
 
