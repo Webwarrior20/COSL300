@@ -33,22 +33,6 @@ export default function AdminLoginPage() {
     window.location.href = "/admin-content";
   };
 
-  const signup = async () => {
-    if (!email || !password) {
-      setMsg("Enter email and password.");
-      return;
-    }
-
-    setMsg("Creating account...");
-    const { error } = await sb.auth.signUp({ email, password });
-    if (error) {
-      setMsg(error.message || "Signup failed.");
-      return;
-    }
-
-    setMsg("Account created. Login now, or confirm email first if Supabase requires it.");
-  };
-
   return (
     <main className="page">
       <section className="card adminLoginCard">
@@ -82,7 +66,6 @@ export default function AdminLoginPage() {
 
           <div className="row adminLoginActions">
             <button className="btn btn-primary" onClick={login}>LOGIN</button>
-            <button className="btn btn-ghost" onClick={signup}>SIGN UP</button>
             <button className="btn btn-ghost" onClick={() => { window.location.href = "/"; }}>BACK</button>
           </div>
         </div>
